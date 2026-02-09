@@ -56,6 +56,8 @@ export class UIScene extends Phaser.Scene {
   private minimapBg!: Phaser.GameObjects.Rectangle;
   private minimapGraphics!: Phaser.GameObjects.Graphics;
 
+  private menuIcon!: Phaser.GameObjects.Text;
+
   private playerData: any = null;
 
   constructor() {
@@ -77,6 +79,7 @@ export class UIScene extends Phaser.Scene {
     this.createPlayerCount();
     this.createMinimap();
     this.createSkillBar();
+    this.createMenuIcon();
 
     // Listen for player updates from GameScene
     this.events.on('updatePlayer', this.handlePlayerUpdate, this);
@@ -373,6 +376,22 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  private createMenuIcon() {
+    this.menuIcon = this.add.text(this.scale.width - 16, 16, '≡', {
+      fontSize: '32px',
+      color: '#aaaaaa',
+      fontFamily: '"Courier New", monospace',
+      backgroundColor: '#00000066',
+      padding: { x: 8, y: 2 },
+    });
+    this.menuIcon.setOrigin(1, 0);
+    this.menuIcon.setDepth(900);
+    this.menuIcon.setInteractive({ useHandCursor: true });
+    this.menuIcon.on('pointerdown', () => {
+      this.events.emit('togglePause');
+    });
+  }
+
   private updateSkills(skills: any[], skillPoints: number) {
     this.skillPointsText.setText(`SP: ${skillPoints}`);
 
@@ -582,6 +601,9 @@ export class UIScene extends Phaser.Scene {
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
+    // Update menu icon position
+    this.menuIcon.setPosition(gameSize.width - 16, 16);
+
     // Update player count position
     this.playerCountText.setPosition(gameSize.width - 20, 20);
 

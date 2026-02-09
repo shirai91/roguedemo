@@ -76,7 +76,6 @@ export class GameScene extends Phaser.Scene {
   // Menu / pause
   private playerName = 'Anonymous';
   private pauseOverlay?: Phaser.GameObjects.Container;
-  private menuIcon?: Phaser.GameObjects.Text;
   private escKey?: Phaser.Input.Keyboard.Key;
 
   constructor() {
@@ -160,21 +159,9 @@ export class GameScene extends Phaser.Scene {
       this.togglePause();
     });
 
-    // Menu icon (top-right, fixed to camera) for mobile
-    this.menuIcon = this.add.text(this.cameras.main.width - 16, 16, '≡', {
-      fontSize: '32px',
-      color: '#aaaaaa',
-      fontFamily: '"Courier New", monospace',
-      backgroundColor: '#00000066',
-      padding: { x: 8, y: 2 },
-    });
-    this.menuIcon.setOrigin(1, 0);
-    this.menuIcon.setScrollFactor(0);
-    this.menuIcon.setDepth(900);
-    this.menuIcon.setInteractive({ useHandCursor: true });
-    this.menuIcon.on('pointerdown', () => {
-      this.togglePause();
-    });
+    // Listen for pause toggle from UIScene menu icon
+    const uiScene = this.scene.get('UIScene');
+    uiScene.events.on('togglePause', this.togglePause, this);
 
     // Setup mobile controls if needed
     if (this.isMobile) {
@@ -818,6 +805,10 @@ export class GameScene extends Phaser.Scene {
 
     // Disconnect from server
     networkClient.disconnect();
+
+    // Remove event listener before stopping UIScene
+    const uiScene = this.scene.get('UIScene');
+    uiScene.events.off('togglePause', this.togglePause, this);
 
     // Stop UIScene
     this.scene.stop('UIScene');
