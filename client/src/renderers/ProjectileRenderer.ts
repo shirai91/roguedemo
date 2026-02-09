@@ -9,6 +9,7 @@ const DAMAGE_TYPE_COLORS: Record<string, number> = {
 
 export class ProjectileRenderer {
   private sprites: Map<string, Phaser.GameObjects.Arc | Phaser.GameObjects.Image> = new Map();
+  private targets: Map<string, { x: number; y: number }> = new Map();
 
   constructor(private scene: Phaser.Scene) {}
 
@@ -19,6 +20,7 @@ export class ProjectileRenderer {
       img.setScale(16 / 32);
       img.setRotation(projectile.angle);
       this.sprites.set(key, img);
+      this.targets.set(key, { x: projectile.x, y: projectile.y });
       return;
     }
 
@@ -30,6 +32,7 @@ export class ProjectileRenderer {
         img.setScale(16 / 32);
         img.setRotation(projectile.angle);
         this.sprites.set(key, img);
+        this.targets.set(key, { x: projectile.x, y: projectile.y });
         return;
       }
     }
@@ -38,16 +41,33 @@ export class ProjectileRenderer {
     const color = DAMAGE_TYPE_COLORS[projectile.damageType] ?? 0xffffff;
     const arc = this.scene.add.arc(projectile.x, projectile.y, 4, 0, 360, false, color);
     this.sprites.set(key, arc);
+    this.targets.set(key, { x: projectile.x, y: projectile.y });
   }
 
   update(projectile: any, key: string): void {
-    const sprite = this.sprites.get(key);
-    if (sprite) {
-      sprite.setPosition(projectile.x, projectile.y);
-      if (sprite instanceof Phaser.GameObjects.Image) {
-        sprite.setRotation(projectile.angle);
-      }
+    const target = this.targets.get(key);
+    if (target) {
+      target.x = projectile.x;
+      target.y = projectile.y;
     }
+    const sprite = this.sprites.get(key);
+    if (sprite && sprite instanceof Phaser.GameObjects.Image) {
+      sprite.setRotation(projectile.angle);
+    }
+  }
+
+  interpolate(dt: number): void {
+    const factor = 0.45;
+    this.sprites.forEach((sprite, key) => {
+      const target = this.targets.get(key);
+      if (!target) return;
+      const cx = sprite.x;
+      const cy = sprite.y;
+      sprite.setPosition(
+        cx + (target.x - cx) * factor,
+        cy + (target.y - cy) * factor
+      );
+    });
   }
 
   remove(key: string): void {
@@ -56,10 +76,12 @@ export class ProjectileRenderer {
       sprite.destroy();
       this.sprites.delete(key);
     }
+    this.targets.delete(key);
   }
 
   destroyAll(): void {
     this.sprites.forEach(s => s.destroy());
     this.sprites.clear();
+    this.targets.clear();
   }
 }

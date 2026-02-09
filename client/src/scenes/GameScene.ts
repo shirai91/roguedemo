@@ -450,8 +450,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  update() {
+  update(time: number, delta: number) {
     if (!networkClient.room) return;
+
+    // Interpolate all renderers for smooth movement between server ticks
+    this.playerRenderer.interpolate(delta);
+    this.monsterRenderer.interpolate(delta);
+    this.projectileRenderer.interpolate(delta);
 
     const player = networkClient.room.state.players.get(networkClient.sessionId);
     if (!player || player.isDead) {

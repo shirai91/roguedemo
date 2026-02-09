@@ -8,6 +8,8 @@ interface MonsterSprite {
   glow?: Phaser.GameObjects.Graphics;
   levelText: Phaser.GameObjects.Text;
   lastHp: number;
+  targetX: number;
+  targetY: number;
 }
 
 export class MonsterRenderer {
@@ -61,14 +63,15 @@ export class MonsterRenderer {
 
     const container = this.scene.add.container(monster.x, monster.y, children);
 
-    this.sprites.set(key, { container, image, hpBar, hpBg, glow, levelText, lastHp: monster.hp });
+    this.sprites.set(key, { container, image, hpBar, hpBg, glow, levelText, lastHp: monster.hp, targetX: monster.x, targetY: monster.y });
   }
 
   update(monster: any, key: string): void {
     const sprite = this.sprites.get(key);
     if (!sprite) return;
 
-    sprite.container.setPosition(monster.x, monster.y);
+    sprite.targetX = monster.x;
+    sprite.targetY = monster.y;
 
     // Damage flash
     if (monster.hp < sprite.lastHp) {
@@ -95,6 +98,18 @@ export class MonsterRenderer {
       sprite.container.destroy();
       this.sprites.delete(key);
     }
+  }
+
+  interpolate(dt: number): void {
+    const factor = 0.25;
+    this.sprites.forEach(sprite => {
+      const cx = sprite.container.x;
+      const cy = sprite.container.y;
+      sprite.container.setPosition(
+        cx + (sprite.targetX - cx) * factor,
+        cy + (sprite.targetY - cy) * factor
+      );
+    });
   }
 
   destroyAll(): void {

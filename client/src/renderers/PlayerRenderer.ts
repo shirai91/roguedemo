@@ -7,6 +7,8 @@ interface PlayerSprite {
   hpBar: Phaser.GameObjects.Graphics;
   hpBg: Phaser.GameObjects.Graphics;
   lastHp: number;
+  targetX: number;
+  targetY: number;
 }
 
 export class PlayerRenderer {
@@ -41,14 +43,15 @@ export class PlayerRenderer {
 
     const container = this.scene.add.container(player.x, player.y, [image, nameText, hpBg, hpBar]);
 
-    this.sprites.set(key, { container, image, nameText, hpBar, hpBg, lastHp: player.hp });
+    this.sprites.set(key, { container, image, nameText, hpBar, hpBg, lastHp: player.hp, targetX: player.x, targetY: player.y });
   }
 
   update(player: any, key: string): void {
     const sprite = this.sprites.get(key);
     if (!sprite) return;
 
-    sprite.container.setPosition(player.x, player.y);
+    sprite.targetX = player.x;
+    sprite.targetY = player.y;
 
     // Damage flash
     if (player.hp < sprite.lastHp) {
@@ -78,6 +81,18 @@ export class PlayerRenderer {
 
   getContainer(key: string): Phaser.GameObjects.Container | undefined {
     return this.sprites.get(key)?.container;
+  }
+
+  interpolate(dt: number): void {
+    const factor = 0.25;
+    this.sprites.forEach(sprite => {
+      const cx = sprite.container.x;
+      const cy = sprite.container.y;
+      sprite.container.setPosition(
+        cx + (sprite.targetX - cx) * factor,
+        cy + (sprite.targetY - cy) * factor
+      );
+    });
   }
 
   destroyAll(): void {
