@@ -8,6 +8,11 @@ export class HpBar {
   private xpBg!: Phaser.GameObjects.Graphics;
   private xpText!: Phaser.GameObjects.Text;
   private statsText!: Phaser.GameObjects.Text;
+  private lastHp = -1;
+  private lastMaxHp = -1;
+  private lastLevel = -1;
+  private lastXp = -1;
+  private lastXpToNext = -1;
 
   constructor(private scene: Phaser.Scene) {}
 
@@ -63,6 +68,9 @@ export class HpBar {
   }
 
   updateHp(hp: number, maxHp: number): void {
+    if (hp === this.lastHp && maxHp === this.lastMaxHp) return;
+    this.lastHp = hp;
+    this.lastMaxHp = maxHp;
     const hpPercent = Math.max(0, hp / maxHp);
     this.hpBar.clear();
     this.hpBar.fillStyle(0x00ff00, 1);
@@ -71,6 +79,10 @@ export class HpBar {
   }
 
   updateXp(level: number, xp: number, xpToNext: number): void {
+    if (level === this.lastLevel && xp === this.lastXp && xpToNext === this.lastXpToNext) return;
+    this.lastLevel = level;
+    this.lastXp = xp;
+    this.lastXpToNext = xpToNext;
     const xpPercent = xpToNext > 0 ? xp / xpToNext : 1;
     this.xpBar.clear();
     this.xpBar.fillStyle(0x3333ff, 1);

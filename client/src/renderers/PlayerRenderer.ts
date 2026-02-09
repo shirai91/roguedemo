@@ -57,13 +57,15 @@ export class PlayerRenderer {
         sprite.image.clearTint();
       });
     }
-    sprite.lastHp = player.hp;
 
-    // Update HP bar
-    sprite.hpBar.clear();
-    const hpPercent = Math.max(0, player.hp / player.maxHp);
-    sprite.hpBar.fillStyle(0x00ff00, 1);
-    sprite.hpBar.fillRect(-15, -22, 30 * hpPercent, 4);
+    // Update HP bar only if hp changed
+    if (player.hp !== sprite.lastHp) {
+      sprite.hpBar.clear();
+      const hpPercent = Math.max(0, player.hp / player.maxHp);
+      sprite.hpBar.fillStyle(0x00ff00, 1);
+      sprite.hpBar.fillRect(-15, -22, 30 * hpPercent, 4);
+    }
+    sprite.lastHp = player.hp;
   }
 
   remove(key: string): void {

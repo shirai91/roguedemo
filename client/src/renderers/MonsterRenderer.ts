@@ -77,14 +77,16 @@ export class MonsterRenderer {
         sprite.image.clearTint();
       });
     }
-    sprite.lastHp = monster.hp;
 
-    // Update HP bar
-    const size = monster.size || 20;
-    sprite.hpBar.clear();
-    const hpPercent = Math.max(0, monster.hp / monster.maxHp);
-    sprite.hpBar.fillStyle(0xff0000, 1);
-    sprite.hpBar.fillRect(-size / 2, -size / 2 - 8, size * hpPercent, 4);
+    // Update HP bar only if hp changed
+    if (monster.hp !== sprite.lastHp) {
+      const size = monster.size || 20;
+      sprite.hpBar.clear();
+      const hpPercent = Math.max(0, monster.hp / monster.maxHp);
+      sprite.hpBar.fillStyle(0xff0000, 1);
+      sprite.hpBar.fillRect(-size / 2, -size / 2 - 8, size * hpPercent, 4);
+      sprite.lastHp = monster.hp;
+    }
   }
 
   remove(key: string): void {

@@ -6,6 +6,8 @@ export class SkillBar {
   private skillBarContainer!: Phaser.GameObjects.Container;
   private skillSlots: Phaser.GameObjects.Container[] = [];
   private skillPointsText!: Phaser.GameObjects.Text;
+  private lastSkillPoints = -1;
+  private lastSkillState: string[] = [];
 
   constructor(private scene: Phaser.Scene) {}
 
@@ -70,7 +72,10 @@ export class SkillBar {
   }
 
   updateSkills(skills: any[], skillPoints: number): void {
-    this.skillPointsText.setText(`SP: ${skillPoints}`);
+    if (skillPoints !== this.lastSkillPoints) {
+      this.lastSkillPoints = skillPoints;
+      this.skillPointsText.setText(`SP: ${skillPoints}`);
+    }
 
     for (let i = 0; i < 5; i++) {
       const slot = this.skillSlots[i];
@@ -90,6 +95,12 @@ export class SkillBar {
       }
 
       if (skill && skill.skillId) {
+        const stateKey = `${skill.skillId}:${skill.level}:${skillPoints}`;
+        const changed = this.lastSkillState[i] !== stateKey;
+        this.lastSkillState[i] = stateKey;
+
+        if (!changed) continue;
+
         const spriteKey = SKILL_SPRITES[skill.skillId] || 'flame_0';
         const icon = this.scene.add.image(0, 0, spriteKey);
         icon.setScale(36 / 32);
@@ -106,10 +117,13 @@ export class SkillBar {
           plusBg.setFillStyle(0x006600);
         }
       } else {
-        slotLabel.setText('');
-        levelText.setText('');
-        plusBg.setVisible(false);
-        plusText.setVisible(false);
+        if (this.lastSkillState[i] !== '') {
+          this.lastSkillState[i] = '';
+          slotLabel.setText('');
+          levelText.setText('');
+          plusBg.setVisible(false);
+          plusText.setVisible(false);
+        }
       }
     }
   }
