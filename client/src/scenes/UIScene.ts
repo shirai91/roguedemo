@@ -1,62 +1,26 @@
 import Phaser from 'phaser';
 import { networkClient } from '../network/Client';
-
-const SKILL_SPRITES: Record<string, string> = {
-  fireball: 'flame_0', ice_shard: 'icicle_0', lightning_bolt: 'zap_0',
-  poison_arrow: 'poison_arrow_0', crystal_spear: 'crystal_spear_0',
-  magic_dart: 'magic_dart_0', iron_shot: 'iron_shot_0', acid_venom: 'acid_venom',
-  searing_ray: 'searing_ray_0', holy_arrow: 'arrow_0', sandblast: 'sandblast_0',
-  sting: 'sting_0', stone_arrow: 'stone_arrow_0', frost_nova: 'frost_0',
-  javelin_throw: 'javelin_0_new', magic_bolt: 'magic_bolt_1',
-  divine_judgment: 'goldaura_0', crossbow_bolt: 'crossbow_bolt_0',
-  soul_drain: 'drain_0_new', chaos_orb: 'orb_glow_0',
-};
-
-const SKILL_NAMES: Record<string, string> = {
-  fireball: 'Fireball', ice_shard: 'Ice Shard', lightning_bolt: 'Lightning',
-  poison_arrow: 'Poison', crystal_spear: 'Crystal', magic_dart: 'Dart',
-  iron_shot: 'Iron Shot', acid_venom: 'Acid', searing_ray: 'Searing',
-  holy_arrow: 'Holy', sandblast: 'Sand', sting: 'Sting',
-  stone_arrow: 'Stone', frost_nova: 'Frost', javelin_throw: 'Javelin',
-  magic_bolt: 'Magic', divine_judgment: 'Divine', crossbow_bolt: 'Crossbow',
-  soul_drain: 'Drain', chaos_orb: 'Chaos',
-};
+import { HpBar } from '../ui/HpBar';
+import { InventoryPanel } from '../ui/InventoryPanel';
+import { SkillBar } from '../ui/SkillBar';
+import { DeathOverlay } from '../ui/DeathOverlay';
+import { MenuIcon } from '../ui/MenuIcon';
 
 export class UIScene extends Phaser.Scene {
-  private hpBar!: Phaser.GameObjects.Graphics;
-  private hpBg!: Phaser.GameObjects.Graphics;
-  private hpText!: Phaser.GameObjects.Text;
+  private hpBar!: HpBar;
+  private inventoryPanel!: InventoryPanel;
+  private skillBar!: SkillBar;
+  private deathOverlay!: DeathOverlay;
+  private menuIcon!: MenuIcon;
 
-  private xpBar!: Phaser.GameObjects.Graphics;
-  private xpBg!: Phaser.GameObjects.Graphics;
-  private xpText!: Phaser.GameObjects.Text;
-
-  private statsText!: Phaser.GameObjects.Text;
   private playerCountText!: Phaser.GameObjects.Text;
-
-  private equipmentSlots: Phaser.GameObjects.Container[] = [];
-  private equipmentItems: (Phaser.GameObjects.Image | null)[] = [];
-
-  private inventoryContainer!: Phaser.GameObjects.Container;
-  private inventoryVisible = false;
-  private inventorySlots: Phaser.GameObjects.Container[] = [];
-  private inventoryKey!: Phaser.Input.Keyboard.Key;
-
   private nearbyItemText!: Phaser.GameObjects.Text;
   private pickupKey!: Phaser.Input.Keyboard.Key;
   private nearestItem: { instanceId: string; name: string; distance: number } | null = null;
 
-  private skillBarContainer!: Phaser.GameObjects.Container;
-  private skillSlots: Phaser.GameObjects.Container[] = [];
-  private skillPointsText!: Phaser.GameObjects.Text;
-
-  private deathOverlay?: Phaser.GameObjects.Container;
-
   private minimapContainer!: Phaser.GameObjects.Container;
   private minimapBg!: Phaser.GameObjects.Rectangle;
   private minimapGraphics!: Phaser.GameObjects.Graphics;
-
-  private menuIcon!: Phaser.GameObjects.Text;
 
   private playerData: any = null;
 
@@ -66,29 +30,31 @@ export class UIScene extends Phaser.Scene {
 
   create() {
     // Setup input
-    this.inventoryKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.pickupKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
-    // Create UI elements
-    this.createHPBar();
-    this.createXPBar();
-    this.createStatsPanel();
-    this.createEquipmentPanel();
-    this.createInventoryPanel();
+    // Create UI components
+    this.hpBar = new HpBar(this);
+    this.hpBar.create();
+
+    this.inventoryPanel = new InventoryPanel(this);
+    this.inventoryPanel.create();
+
+    this.skillBar = new SkillBar(this);
+    this.skillBar.create();
+
+    this.deathOverlay = new DeathOverlay(this);
+
+    this.menuIcon = new MenuIcon(this);
+    this.menuIcon.create();
+
     this.createNearbyItemIndicator();
     this.createPlayerCount();
     this.createMinimap();
-    this.createSkillBar();
-    this.createMenuIcon();
 
     // Listen for player updates from GameScene
     this.events.on('updatePlayer', this.handlePlayerUpdate, this);
 
     // Listen for keyboard input
-    this.inventoryKey.on('down', () => {
-      this.toggleInventory();
-    });
-
     this.pickupKey.on('down', () => {
       if (this.nearestItem) {
         networkClient.sendPickup(this.nearestItem.instanceId);
@@ -106,167 +72,8 @@ export class UIScene extends Phaser.Scene {
     this.events.off('updatePlayer', this.handlePlayerUpdate, this);
     this.scale.off('resize', this.handleResize, this);
     this.events.off('shutdown', this.cleanup, this);
-    this.equipmentSlots = [];
-    this.equipmentItems = [];
-    this.inventorySlots = [];
-    this.skillSlots = [];
     this.playerData = null;
     this.nearestItem = null;
-    if (this.deathOverlay) {
-      this.deathOverlay = undefined;
-    }
-  }
-
-  private createHPBar() {
-    const x = 20;
-    const y = 20;
-    const width = 200;
-    const height = 20;
-
-    this.hpBg = this.add.graphics();
-    this.hpBg.fillStyle(0x660000, 1);
-    this.hpBg.fillRect(x, y, width, height);
-
-    this.hpBar = this.add.graphics();
-    this.hpBar.fillStyle(0x00ff00, 1);
-    this.hpBar.fillRect(x, y, width, height);
-
-    this.hpText = this.add.text(x + width / 2, y + height / 2, 'HP: 100/100', {
-      fontSize: '14px',
-      color: '#ffffff',
-      fontStyle: 'bold'
-    });
-    this.hpText.setOrigin(0.5);
-  }
-
-  private createXPBar() {
-    const x = 20;
-    const y = 50;
-    const width = 200;
-    const height = 15;
-
-    this.xpBg = this.add.graphics();
-    this.xpBg.fillStyle(0x333333, 1);
-    this.xpBg.fillRect(x, y, width, height);
-
-    this.xpBar = this.add.graphics();
-    this.xpBar.fillStyle(0x3333ff, 1);
-    this.xpBar.fillRect(x, y, width * 0.5, height);
-
-    this.xpText = this.add.text(x + width / 2, y + height / 2, 'Level 1 (0/100)', {
-      fontSize: '12px',
-      color: '#ffffff'
-    });
-    this.xpText.setOrigin(0.5);
-  }
-
-  private createStatsPanel() {
-    this.statsText = this.add.text(20, 75, '', {
-      fontSize: '11px',
-      color: '#cccccc',
-      backgroundColor: '#00000088',
-      padding: { x: 6, y: 4 }
-    });
-  }
-
-  private createEquipmentPanel() {
-    const startX = 20;
-    const startY = this.scale.height - 80;
-    const slotSize = 40;
-    const gap = 5;
-
-    for (let i = 0; i < 6; i++) {
-      const x = startX + i * (slotSize + gap);
-      const y = startY;
-
-      const slotBg = this.add.rectangle(0, 0, slotSize, slotSize, 0x333333);
-      slotBg.setStrokeStyle(2, 0x666666);
-
-      const slotText = this.add.text(0, slotSize / 2 + 8, `${i + 1}`, {
-        fontSize: '10px',
-        color: '#888888'
-      });
-      slotText.setOrigin(0.5);
-
-      const container = this.add.container(x, y, [slotBg, slotText]);
-      container.setSize(slotSize, slotSize);
-      container.setInteractive();
-
-      container.on('pointerdown', () => {
-        this.handleUnequip(i);
-      });
-
-      this.equipmentSlots.push(container);
-      this.equipmentItems.push(null);
-    }
-  }
-
-  private createInventoryPanel() {
-    const width = 300;
-    const height = 400;
-    const x = this.scale.width / 2;
-    const y = this.scale.height / 2;
-
-    const bg = this.add.rectangle(0, 0, width, height, 0x222222, 0.95);
-    bg.setStrokeStyle(2, 0x666666);
-
-    const title = this.add.text(0, -height / 2 + 20, 'INVENTORY (I)', {
-      fontSize: '18px',
-      color: '#ffffff',
-      fontStyle: 'bold'
-    });
-    title.setOrigin(0.5);
-
-    const closeBtn = this.add.text(width / 2 - 20, -height / 2 + 20, 'X', {
-      fontSize: '18px',
-      color: '#ff0000',
-      fontStyle: 'bold'
-    });
-    closeBtn.setOrigin(0.5);
-    closeBtn.setInteractive();
-    closeBtn.on('pointerdown', () => {
-      this.toggleInventory();
-    });
-
-    const children: Phaser.GameObjects.GameObject[] = [bg, title, closeBtn];
-
-    // Create inventory slots (5x4 grid = 20 slots)
-    const slotSize = 50;
-    const gap = 5;
-    const cols = 5;
-    const rows = 4;
-    const gridWidth = cols * slotSize + (cols - 1) * gap;
-    const gridHeight = rows * slotSize + (rows - 1) * gap;
-    const startX = -gridWidth / 2 + slotSize / 2;
-    const startY = -height / 2 + 60;
-
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const slotX = startX + col * (slotSize + gap);
-        const slotY = startY + row * (slotSize + gap);
-
-        const slotBg = this.add.rectangle(0, 0, slotSize, slotSize, 0x444444);
-        slotBg.setStrokeStyle(2, 0x666666);
-
-        const slotContainer = this.add.container(slotX, slotY, [slotBg]);
-        slotContainer.setSize(slotSize, slotSize);
-        slotContainer.setInteractive();
-
-        const index = row * cols + col;
-        slotContainer.setData('index', index);
-
-        slotContainer.on('pointerdown', () => {
-          this.handleInventoryClick(index);
-        });
-
-        this.inventorySlots.push(slotContainer);
-        children.push(slotContainer);
-      }
-    }
-
-    this.inventoryContainer = this.add.container(x, y, children);
-    this.inventoryContainer.setDepth(500);
-    this.inventoryContainer.setVisible(false);
   }
 
   private createNearbyItemIndicator() {
@@ -314,307 +121,47 @@ export class UIScene extends Phaser.Scene {
     this.minimapContainer = this.add.container(x, y, [this.minimapBg, this.minimapGraphics]);
   }
 
-  private createSkillBar() {
-    const slotSize = 48;
-    const gap = 4;
-    const totalWidth = 5 * slotSize + 4 * gap;
-    const startX = this.scale.width / 2 - totalWidth / 2 + slotSize / 2;
-    const y = this.scale.height - 50;
-
-    const children: Phaser.GameObjects.GameObject[] = [];
-
-    // Skill points label
-    this.skillPointsText = this.add.text(this.scale.width / 2, y - slotSize / 2 - 14, 'SP: 0', {
-      fontSize: '12px',
-      color: '#00ffff',
-      fontStyle: 'bold'
-    });
-    this.skillPointsText.setOrigin(0.5);
-
-    for (let i = 0; i < 5; i++) {
-      const x = startX + i * (slotSize + gap);
-
-      const slotBg = this.add.rectangle(0, 0, slotSize, slotSize, 0x1a1a2e);
-      slotBg.setStrokeStyle(2, 0x00aaaa);
-
-      const slotLabel = this.add.text(0, slotSize / 2 + 10, '', {
-        fontSize: '9px',
-        color: '#aaaaaa'
-      });
-      slotLabel.setOrigin(0.5);
-
-      const levelText = this.add.text(slotSize / 2 - 2, -slotSize / 2 + 2, '', {
-        fontSize: '10px',
-        color: '#ffff00',
-        fontStyle: 'bold'
-      });
-      levelText.setOrigin(1, 0);
-
-      // "+" button for leveling
-      const plusBg = this.add.rectangle(slotSize / 2 - 2, slotSize / 2 - 2, 16, 16, 0x006600);
-      plusBg.setStrokeStyle(1, 0x00ff00);
-      plusBg.setInteractive();
-      plusBg.setVisible(false);
-
-      const plusText = this.add.text(slotSize / 2 - 2, slotSize / 2 - 2, '+', {
-        fontSize: '12px',
-        color: '#00ff00',
-        fontStyle: 'bold'
-      });
-      plusText.setOrigin(0.5);
-      plusText.setVisible(false);
-
-      const slotIndex = i;
-      plusBg.on('pointerdown', () => {
-        networkClient.sendLevelSkill(slotIndex);
-      });
-
-      const container = this.add.container(x, y, [slotBg, slotLabel, levelText, plusBg, plusText]);
-      container.setSize(slotSize, slotSize);
-
-      this.skillSlots.push(container);
-    }
-  }
-
-  private createMenuIcon() {
-    this.menuIcon = this.add.text(this.scale.width - 16, 16, '≡', {
-      fontSize: '32px',
-      color: '#aaaaaa',
-      fontFamily: '"Courier New", monospace',
-      backgroundColor: '#00000066',
-      padding: { x: 8, y: 2 },
-    });
-    this.menuIcon.setOrigin(1, 0);
-    this.menuIcon.setDepth(900);
-    this.menuIcon.setInteractive({ useHandCursor: true });
-    this.menuIcon.on('pointerdown', () => {
-      this.events.emit('togglePause');
-    });
-  }
-
-  private updateSkills(skills: any[], skillPoints: number) {
-    this.skillPointsText.setText(`SP: ${skillPoints}`);
-
-    for (let i = 0; i < 5; i++) {
-      const slot = this.skillSlots[i];
-      const skill = skills[i];
-
-      // Get slot children: [0]=bg, [1]=label, [2]=levelText, [3]=plusBg, [4]=plusText, then optional [5]=icon
-      const slotLabel = slot.getAt(1) as Phaser.GameObjects.Text;
-      const levelText = slot.getAt(2) as Phaser.GameObjects.Text;
-      const plusBg = slot.getAt(3) as Phaser.GameObjects.Rectangle;
-      const plusText = slot.getAt(4) as Phaser.GameObjects.Text;
-
-      // Remove old icon if exists (index 5+)
-      while (slot.length > 5) {
-        const old = slot.getAt(5);
-        old.destroy();
-        slot.removeAt(5);
-      }
-
-      if (skill && skill.skillId) {
-        const spriteKey = SKILL_SPRITES[skill.skillId] || 'flame_0';
-        const icon = this.add.image(0, 0, spriteKey);
-        icon.setScale(36 / 32);
-        slot.addAt(icon, 5);
-
-        slotLabel.setText(SKILL_NAMES[skill.skillId] || skill.skillId);
-        levelText.setText(`Lv${skill.level}`);
-
-        // Show "+" button if can level up
-        const canLevel = skillPoints > 0 && skill.level < 10;
-        plusBg.setVisible(canLevel);
-        plusText.setVisible(canLevel);
-        if (canLevel) {
-          plusBg.setFillStyle(0x006600);
-        }
-      } else {
-        slotLabel.setText('');
-        levelText.setText('');
-        plusBg.setVisible(false);
-        plusText.setVisible(false);
-      }
-    }
-  }
-
   private handlePlayerUpdate(player: any) {
     this.playerData = player;
 
     // Update HP bar
-    const hpPercent = Math.max(0, player.hp / player.maxHp);
-    this.hpBar.clear();
-    this.hpBar.fillStyle(0x00ff00, 1);
-    this.hpBar.fillRect(20, 20, 200 * hpPercent, 20);
-    this.hpText.setText(`HP: ${Math.ceil(player.hp)}/${player.maxHp}`);
+    this.hpBar.updateHp(player.hp, player.maxHp);
 
     // Update XP bar
-    const xpPercent = player.xpToNext > 0 ? player.xp / player.xpToNext : 1;
-    this.xpBar.clear();
-    this.xpBar.fillStyle(0x3333ff, 1);
-    this.xpBar.fillRect(20, 50, 200 * xpPercent, 15);
-    this.xpText.setText(`Level ${player.level} (${player.xp}/${player.xpToNext})`);
+    this.hpBar.updateXp(player.level, player.xp, player.xpToNext);
 
-    // Update stats from player schema properties
-    const statsText = [
-      `ATK: ${Math.round(player.rawAttack || 0)}  SPELL: ${Math.round(player.rawSpell || 0)}`,
-      `ARM: ${Math.round(player.armour || 0)}  MRES: ${Math.round(player.magicRes || 0)}`,
-      `SPD: ${Math.round(player.moveSpeed || 0)}  ASPD: ${(player.attackSpeed || 0).toFixed(2)}`
-    ].join('\n');
-    this.statsText.setText(statsText);
+    // Update stats
+    this.hpBar.updateStats(player);
 
     // Update equipment
-    this.updateEquipment(player.equipment || []);
+    this.inventoryPanel.updateEquipment(player.equipment || []);
 
     // Update inventory
-    this.updateInventory(player.inventory || []);
+    this.inventoryPanel.updateInventory(player.inventory || []);
+
+    // Update player data for inventory panel click handling
+    this.inventoryPanel.setPlayerData(player);
 
     // Update skills
-    this.updateSkills(player.skills || [], player.skillPoints || 0);
+    this.skillBar.updateSkills(player.skills || [], player.skillPoints || 0);
 
     // Check for death
-    if (player.isDead && !this.deathOverlay) {
-      this.showDeathOverlay();
-    } else if (!player.isDead && this.deathOverlay) {
-      this.hideDeathOverlay();
-    }
-  }
-
-  private getItemSpriteKey(itemId: string): string {
-    if (itemId.includes('sword') || itemId.includes('wand') || itemId.includes('staff')) return 'item_weapon';
-    if (itemId.includes('ring')) return 'item_ring';
-    if (itemId.includes('amulet')) return 'item_amulet';
-    if (itemId.includes('potion')) return 'item_potion';
-    return 'item_armor';
-  }
-
-  private updateEquipment(equipment: any[]) {
-    for (let i = 0; i < 6; i++) {
-      const slot = this.equipmentSlots[i];
-      const item = equipment[i];
-
-      // Remove old item visual
-      if (this.equipmentItems[i]) {
-        this.equipmentItems[i]?.destroy();
-        this.equipmentItems[i] = null;
-      }
-
-      // Add new item visual (check itemId to distinguish from empty placeholder)
-      if (item && item.itemId) {
-        const spriteKey = this.getItemSpriteKey(item.itemId);
-        const itemImage = this.add.image(0, -5, spriteKey);
-        itemImage.setScale(30 / 32);
-
-        slot.add(itemImage);
-        this.equipmentItems[i] = itemImage;
-      }
-    }
-  }
-
-  private updateInventory(inventory: any[]) {
-    this.inventorySlots.forEach((slot, index) => {
-      // Clear existing item visuals
-      const children = slot.getAll();
-      children.forEach((child, i) => {
-        if (i > 0) child.destroy(); // Keep the background
-      });
-
-      // Add new item visual
-      const item = inventory[index];
-      if (item && item.itemId) {
-        const spriteKey = this.getItemSpriteKey(item.itemId);
-        const itemImage = this.add.image(0, 0, spriteKey);
-        itemImage.setScale(40 / 32);
-
-        // Tier indicator
-        const tierText = this.add.text(15, 15, `T${item.tier || 1}`, {
-          fontSize: '10px',
-          color: '#ffffff',
-          backgroundColor: '#000000'
-        });
-        tierText.setOrigin(1, 1);
-
-        slot.add([itemImage, tierText]);
-      }
-    });
-  }
-
-  private handleUnequip(slotIndex: number) {
-    networkClient.sendUnequip(slotIndex);
-  }
-
-  private handleInventoryClick(inventoryIndex: number) {
-    if (!this.playerData) return;
-
-    const inventory = this.playerData.inventory || [];
-    if (!inventory[inventoryIndex]) return;
-
-    // Find first empty equipment slot
-    const equipment = this.playerData.equipment || [];
-    for (let i = 0; i < 6; i++) {
-      if (!equipment[i] || !equipment[i].itemId) {
-        networkClient.sendEquip(inventoryIndex, i);
-        return;
-      }
-    }
-
-    // If all slots full, replace slot 0
-    networkClient.sendEquip(inventoryIndex, 0);
-  }
-
-  private toggleInventory() {
-    this.inventoryVisible = !this.inventoryVisible;
-    this.inventoryContainer.setVisible(this.inventoryVisible);
-  }
-
-  private showDeathOverlay() {
-    const bg = this.add.rectangle(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      this.scale.width,
-      this.scale.height,
-      0x000000,
-      0.7
-    );
-
-    const text = this.add.text(
-      this.scale.width / 2,
-      this.scale.height / 2,
-      'YOU DIED\nRespawning...',
-      {
-        fontSize: '48px',
-        color: '#ff0000',
-        fontStyle: 'bold',
-        align: 'center'
-      }
-    );
-    text.setOrigin(0.5);
-
-    this.deathOverlay = this.add.container(0, 0, [bg, text]);
-    this.deathOverlay.setDepth(1000);
-  }
-
-  private hideDeathOverlay() {
-    if (this.deathOverlay) {
-      this.deathOverlay.destroy();
-      this.deathOverlay = undefined;
+    if (player.isDead && !this.deathOverlay.isVisible) {
+      this.deathOverlay.show();
+    } else if (!player.isDead && this.deathOverlay.isVisible) {
+      this.deathOverlay.hide();
     }
   }
 
   private handleResize(gameSize: Phaser.Structs.Size) {
     // Update menu icon position
-    this.menuIcon.setPosition(gameSize.width - 16, 16);
+    this.menuIcon.handleResize(gameSize.width, gameSize.height);
 
     // Update player count position
     this.playerCountText.setPosition(gameSize.width - 20, 20);
 
-    // Update equipment panel position
-    const startY = gameSize.height - 80;
-    this.equipmentSlots.forEach((slot, i) => {
-      slot.setY(startY);
-    });
-
-    // Update inventory position
-    this.inventoryContainer.setPosition(gameSize.width / 2, gameSize.height / 2);
+    // Update inventory panel
+    this.inventoryPanel.handleResize(gameSize.width, gameSize.height);
 
     // Update nearby item text position
     this.nearbyItemText.setPosition(gameSize.width / 2, gameSize.height - 120);
@@ -623,24 +170,10 @@ export class UIScene extends Phaser.Scene {
     this.minimapContainer.setPosition(gameSize.width - 95, gameSize.height - 95);
 
     // Update skill bar position
-    const skillSlotSize = 48;
-    const skillGap = 4;
-    const skillTotalWidth = 5 * skillSlotSize + 4 * skillGap;
-    const skillStartX = gameSize.width / 2 - skillTotalWidth / 2 + skillSlotSize / 2;
-    const skillY = gameSize.height - 50;
-    this.skillSlots.forEach((slot, i) => {
-      slot.setPosition(skillStartX + i * (skillSlotSize + skillGap), skillY);
-    });
-    this.skillPointsText.setPosition(gameSize.width / 2, skillY - skillSlotSize / 2 - 14);
+    this.skillBar.handleResize(gameSize.width, gameSize.height);
 
     // Update death overlay if visible
-    if (this.deathOverlay) {
-      const bg = this.deathOverlay.getAt(0) as Phaser.GameObjects.Rectangle;
-      const text = this.deathOverlay.getAt(1) as Phaser.GameObjects.Text;
-      bg.setSize(gameSize.width, gameSize.height);
-      bg.setPosition(gameSize.width / 2, gameSize.height / 2);
-      text.setPosition(gameSize.width / 2, gameSize.height / 2);
-    }
+    this.deathOverlay.handleResize(gameSize.width, gameSize.height);
   }
 
   update() {

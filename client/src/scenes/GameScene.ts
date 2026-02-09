@@ -1,57 +1,21 @@
 import Phaser from 'phaser';
 import { networkClient } from '../network/Client';
-
-const MAP_WIDTH = 3000;
-const MAP_HEIGHT = 3000;
-const GRID_SIZE = 100;
-
-const SKILL_SPRITES: Record<string, string> = {
-  fireball: 'flame_0', ice_shard: 'icicle_0', lightning_bolt: 'zap_0',
-  poison_arrow: 'poison_arrow_0', crystal_spear: 'crystal_spear_0',
-  magic_dart: 'magic_dart_0', iron_shot: 'iron_shot_0', acid_venom: 'acid_venom',
-  searing_ray: 'searing_ray_0', holy_arrow: 'arrow_0', sandblast: 'sandblast_0',
-  sting: 'sting_0', stone_arrow: 'stone_arrow_0', frost_nova: 'frost_0',
-  javelin_throw: 'javelin_0_new', magic_bolt: 'magic_bolt_1',
-  divine_judgment: 'goldaura_0', crossbow_bolt: 'crossbow_bolt_0',
-  soul_drain: 'drain_0_new', chaos_orb: 'orb_glow_0',
-};
-
-interface PlayerSprite {
-  container: Phaser.GameObjects.Container;
-  image: Phaser.GameObjects.Image;
-  nameText: Phaser.GameObjects.Text;
-  hpBar: Phaser.GameObjects.Graphics;
-  hpBg: Phaser.GameObjects.Graphics;
-}
-
-interface MonsterSprite {
-  container: Phaser.GameObjects.Container;
-  image: Phaser.GameObjects.Image;
-  hpBar: Phaser.GameObjects.Graphics;
-  hpBg: Phaser.GameObjects.Graphics;
-  glow?: Phaser.GameObjects.Graphics;
-}
-
-interface ItemSprite {
-  container: Phaser.GameObjects.Container;
-  image: Phaser.GameObjects.Image;
-  glow: Phaser.GameObjects.Graphics;
-}
-
-interface SkillSprite {
-  container: Phaser.GameObjects.Container;
-  image: Phaser.GameObjects.Image;
-  glow: Phaser.GameObjects.Graphics;
-}
+import { MAP_WIDTH, MAP_HEIGHT, GRID_SIZE, preloadAssets } from '../data/sprites';
+import { PlayerRenderer } from '../renderers/PlayerRenderer';
+import { MonsterRenderer } from '../renderers/MonsterRenderer';
+import { ProjectileRenderer } from '../renderers/ProjectileRenderer';
+import { ItemRenderer } from '../renderers/ItemRenderer';
+import { MapRenderer } from '../renderers/MapRenderer';
+import { PauseOverlay } from '../ui/PauseOverlay';
 
 export class GameScene extends Phaser.Scene {
-  private playerSprites: Map<string, PlayerSprite> = new Map();
-  private monsterSprites: Map<string, MonsterSprite> = new Map();
-  private projectileSprites: Map<string, Phaser.GameObjects.Arc | Phaser.GameObjects.Image> = new Map();
-  private itemSprites: Map<string, ItemSprite> = new Map();
-  private droppedSkillSprites: Map<string, SkillSprite> = new Map();
+  private playerRenderer!: PlayerRenderer;
+  private monsterRenderer!: MonsterRenderer;
+  private projectileRenderer!: ProjectileRenderer;
+  private itemRenderer!: ItemRenderer;
+  private mapRenderer!: MapRenderer;
+  private pauseOverlay!: PauseOverlay;
 
-  private gridGraphics!: Phaser.GameObjects.Graphics;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd: any = {};
   private mousePointer!: Phaser.Input.Pointer;
@@ -75,7 +39,6 @@ export class GameScene extends Phaser.Scene {
 
   // Menu / pause
   private playerName = 'Anonymous';
-  private pauseOverlay?: Phaser.GameObjects.Container;
   private escKey?: Phaser.Input.Keyboard.Key;
 
   constructor() {
@@ -83,39 +46,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    // Player
-    this.load.image('player', 'sprites/player/player.png');
-
-    // Monsters
-    const monsterTypes = [
-      'slime', 'bat', 'imp', 'spider', 'skeleton', 'goblin', 'wolf',
-      'zombie', 'ghost', 'orc', 'wraith', 'harpy', 'troll', 'demon',
-      'basilisk', 'minotaur', 'lich', 'drake', 'golem', 'hydra'
-    ];
-    monsterTypes.forEach(type => {
-      this.load.image(`monster_${type}`, `sprites/monsters/${type}.png`);
-    });
-
-    // Items
-    this.load.image('item_weapon', 'sprites/items/weapon.png');
-    this.load.image('item_armor', 'sprites/items/armor.png');
-    this.load.image('item_ring', 'sprites/items/ring.png');
-    this.load.image('item_amulet', 'sprites/items/amulet.png');
-    this.load.image('item_potion', 'sprites/items/potion.png');
-
-    // Dungeon
-    this.load.image('floor', 'sprites/dungeon/floor.png');
-
-    // Skill effect sprites
-    const skillSprites = [
-      'flame_0', 'icicle_0', 'zap_0', 'poison_arrow_0', 'crystal_spear_0',
-      'magic_dart_0', 'iron_shot_0', 'acid_venom', 'searing_ray_0', 'arrow_0',
-      'sandblast_0', 'sting_0', 'stone_arrow_0', 'frost_0', 'javelin_0_new',
-      'magic_bolt_1', 'goldaura_0', 'crossbow_bolt_0', 'drain_0_new', 'orb_glow_0'
-    ];
-    skillSprites.forEach(name => {
-      this.load.image(name, `sprites/${name}.png`);
-    });
+    preloadAssets(this);
   }
 
   async create(data?: { playerName?: string }) {
@@ -127,8 +58,18 @@ export class GameScene extends Phaser.Scene {
     // Set world bounds
     this.physics.world.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
+    // Create renderers
+    this.mapRenderer = new MapRenderer(this);
+    this.playerRenderer = new PlayerRenderer(this);
+    this.monsterRenderer = new MonsterRenderer(this);
+    this.projectileRenderer = new ProjectileRenderer(this);
+    this.itemRenderer = new ItemRenderer(this);
+
+    // Create pause overlay
+    this.pauseOverlay = new PauseOverlay(this, () => this.quitToMenu());
+
     // Draw grid
-    this.drawGrid();
+    this.mapRenderer.drawGrid(MAP_WIDTH, MAP_HEIGHT, GRID_SIZE);
 
     // Setup input
     this.setupInput();
@@ -166,21 +107,6 @@ export class GameScene extends Phaser.Scene {
     // Setup mobile controls if needed
     if (this.isMobile) {
       this.setupMobileControls();
-    }
-  }
-
-  private drawGrid() {
-    this.gridGraphics = this.add.graphics();
-    this.gridGraphics.lineStyle(1, 0x222222, 1);
-
-    // Vertical lines
-    for (let x = 0; x <= MAP_WIDTH; x += GRID_SIZE) {
-      this.gridGraphics.lineBetween(x, 0, x, MAP_HEIGHT);
-    }
-
-    // Horizontal lines
-    for (let y = 0; y <= MAP_HEIGHT; y += GRID_SIZE) {
-      this.gridGraphics.lineBetween(0, y, MAP_WIDTH, y);
     }
   }
 
@@ -379,335 +305,87 @@ export class GameScene extends Phaser.Scene {
 
     // Players
     room.state.players.onAdd((player: any, key: string) => {
-      this.createPlayer(player, key);
+      const isLocal = key === networkClient.sessionId;
+      this.playerRenderer.create(player, key, isLocal);
 
       player.onChange(() => {
-        this.updatePlayer(player, key);
+        this.playerRenderer.update(player, key);
+
+        // Update UI if local player
+        if (isLocal) {
+          this.updateUIPlayer(player);
+
+          // Handle death
+          if (player.isDead && !this.deathText) {
+            this.showDeathScreen();
+          } else if (!player.isDead && this.deathText) {
+            this.hideDeathScreen();
+          }
+        }
       });
 
       // If this is the local player, follow with camera
-      if (key === networkClient.sessionId) {
-        this.cameras.main.startFollow(this.playerSprites.get(key)?.container as Phaser.GameObjects.GameObject);
+      if (isLocal) {
+        this.cameras.main.startFollow(this.playerRenderer.getContainer(key) as Phaser.GameObjects.GameObject);
         this.updateUIPlayer(player);
       }
     });
 
     room.state.players.onRemove((player: any, key: string) => {
-      this.removePlayer(key);
+      this.playerRenderer.remove(key);
     });
 
     // Monsters
     room.state.monsters.onAdd((monster: any, key: string) => {
-      this.createMonster(monster, key);
+      this.monsterRenderer.create(monster, key);
 
       monster.onChange(() => {
-        this.updateMonster(monster, key);
+        this.monsterRenderer.update(monster, key);
       });
     });
 
     room.state.monsters.onRemove((monster: any, key: string) => {
-      this.removeMonster(key);
+      this.monsterRenderer.remove(key);
     });
 
     // Projectiles
     room.state.projectiles.onAdd((projectile: any, key: string) => {
-      this.createProjectile(projectile, key);
+      this.projectileRenderer.create(projectile, key);
 
       projectile.onChange(() => {
-        this.updateProjectile(projectile, key);
+        this.projectileRenderer.update(projectile, key);
       });
     });
 
     room.state.projectiles.onRemove((projectile: any, key: string) => {
-      this.removeProjectile(key);
+      this.projectileRenderer.remove(key);
     });
 
     // Dropped Items
     room.state.droppedItems.onAdd((item: any, key: string) => {
-      this.createDroppedItem(item, key);
+      this.itemRenderer.createItem(item, key);
 
       item.onChange(() => {
-        this.updateDroppedItem(item, key);
+        this.itemRenderer.updateItem(item, key);
       });
     });
 
     room.state.droppedItems.onRemove((item: any, key: string) => {
-      this.removeDroppedItem(key);
+      this.itemRenderer.removeItem(key);
     });
 
     // Dropped Skills
     room.state.droppedSkills.onAdd((skill: any, key: string) => {
-      this.createDroppedSkill(skill, key);
+      this.itemRenderer.createSkill(skill, key);
 
       skill.onChange(() => {
-        this.updateDroppedSkill(skill, key);
+        this.itemRenderer.updateSkill(skill, key);
       });
     });
 
     room.state.droppedSkills.onRemove((skill: any, key: string) => {
-      this.removeDroppedSkill(key);
+      this.itemRenderer.removeSkill(key);
     });
-  }
-
-  private createPlayer(player: any, key: string) {
-    const isLocal = key === networkClient.sessionId;
-
-    const image = this.add.image(0, 0, 'player');
-    image.setScale(30 / 32);
-    if (!isLocal) {
-      image.setTint(0x88ff88);
-      image.setAlpha(0.8);
-    }
-
-    const nameText = this.add.text(0, -30, player.name || 'Player', {
-      fontSize: '12px',
-      color: '#ffffff',
-      backgroundColor: '#00000088',
-      padding: { x: 4, y: 2 }
-    });
-    nameText.setOrigin(0.5);
-
-    const hpBg = this.add.graphics();
-    hpBg.fillStyle(0x660000, 1);
-    hpBg.fillRect(-15, -22, 30, 4);
-
-    const hpBar = this.add.graphics();
-    const hpPercent = player.hp / player.maxHp;
-    hpBar.fillStyle(0x00ff00, 1);
-    hpBar.fillRect(-15, -22, 30 * hpPercent, 4);
-
-    const container = this.add.container(player.x, player.y, [image, nameText, hpBg, hpBar]);
-
-    this.playerSprites.set(key, { container, image, nameText, hpBar, hpBg });
-  }
-
-  private updatePlayer(player: any, key: string) {
-    const sprite = this.playerSprites.get(key);
-    if (!sprite) return;
-
-    sprite.container.setPosition(player.x, player.y);
-
-    // Update HP bar
-    sprite.hpBar.clear();
-    const hpPercent = Math.max(0, player.hp / player.maxHp);
-    sprite.hpBar.fillStyle(0x00ff00, 1);
-    sprite.hpBar.fillRect(-15, -22, 30 * hpPercent, 4);
-
-    // Update UI if local player
-    if (key === networkClient.sessionId) {
-      this.updateUIPlayer(player);
-
-      // Handle death
-      if (player.isDead && !this.deathText) {
-        this.showDeathScreen();
-      } else if (!player.isDead && this.deathText) {
-        this.hideDeathScreen();
-      }
-    }
-  }
-
-  private removePlayer(key: string) {
-    const sprite = this.playerSprites.get(key);
-    if (sprite) {
-      sprite.container.destroy();
-      this.playerSprites.delete(key);
-    }
-  }
-
-  private createMonster(monster: any, key: string) {
-    const size = monster.size || 20;
-    const scale = size / 32;
-    const spriteKey = `monster_${monster.monsterType}`;
-
-    const children: Phaser.GameObjects.GameObject[] = [];
-
-    // Add rarity glow behind sprite
-    let glow: Phaser.GameObjects.Graphics | undefined;
-    if (monster.rarity === 'magic') {
-      glow = this.add.graphics();
-      glow.fillStyle(0x4444ff, 0.35);
-      glow.fillCircle(0, 0, size / 2 + 6);
-      children.push(glow);
-      this.tweens.add({ targets: glow, alpha: 0.1, duration: 1000, yoyo: true, repeat: -1 });
-    } else if (monster.rarity === 'rare') {
-      glow = this.add.graphics();
-      glow.fillStyle(0xffff00, 0.35);
-      glow.fillCircle(0, 0, size / 2 + 6);
-      children.push(glow);
-      this.tweens.add({ targets: glow, alpha: 0.1, duration: 800, yoyo: true, repeat: -1 });
-    }
-
-    const image = this.add.image(0, 0, spriteKey);
-    image.setScale(scale);
-    children.push(image);
-
-    // Normal monsters get a subtle white border
-    if (!monster.rarity || monster.rarity === 'normal') {
-      const border = this.add.graphics();
-      border.lineStyle(1, 0xffffff, 0.4);
-      border.strokeRect(-size / 2, -size / 2, size, size);
-      children.push(border);
-    }
-
-    const hpBg = this.add.graphics();
-    hpBg.fillStyle(0x660000, 1);
-    hpBg.fillRect(-size / 2, -size / 2 - 8, size, 4);
-
-    const hpBar = this.add.graphics();
-    const hpPercent = monster.hp / monster.maxHp;
-    hpBar.fillStyle(0xff0000, 1);
-    hpBar.fillRect(-size / 2, -size / 2 - 8, size * hpPercent, 4);
-
-    children.push(hpBg, hpBar);
-
-    const container = this.add.container(monster.x, monster.y, children);
-
-    this.monsterSprites.set(key, { container, image, hpBar, hpBg, glow });
-  }
-
-  private updateMonster(monster: any, key: string) {
-    const sprite = this.monsterSprites.get(key);
-    if (!sprite) return;
-
-    sprite.container.setPosition(monster.x, monster.y);
-
-    // Update HP bar
-    const size = monster.size || 20;
-    sprite.hpBar.clear();
-    const hpPercent = Math.max(0, monster.hp / monster.maxHp);
-    sprite.hpBar.fillStyle(0xff0000, 1);
-    sprite.hpBar.fillRect(-size / 2, -size / 2 - 8, size * hpPercent, 4);
-  }
-
-  private removeMonster(key: string) {
-    const sprite = this.monsterSprites.get(key);
-    if (sprite) {
-      sprite.container.destroy();
-      this.monsterSprites.delete(key);
-    }
-  }
-
-  private createProjectile(projectile: any, key: string) {
-    if (projectile.skillId) {
-      const spriteKey = SKILL_SPRITES[projectile.skillId];
-      if (spriteKey) {
-        const img = this.add.image(projectile.x, projectile.y, spriteKey);
-        img.setScale(16 / 32);
-        img.setRotation(projectile.angle);
-        this.projectileSprites.set(key, img);
-        return;
-      }
-    }
-    const arc = this.add.arc(projectile.x, projectile.y, 4, 0, 360, false, 0xffffff);
-    this.projectileSprites.set(key, arc);
-  }
-
-  private updateProjectile(projectile: any, key: string) {
-    const sprite = this.projectileSprites.get(key);
-    if (sprite) {
-      sprite.setPosition(projectile.x, projectile.y);
-      if (sprite instanceof Phaser.GameObjects.Image) {
-        sprite.setRotation(projectile.angle);
-      }
-    }
-  }
-
-  private removeProjectile(key: string) {
-    const sprite = this.projectileSprites.get(key);
-    if (sprite) {
-      sprite.destroy();
-      this.projectileSprites.delete(key);
-    }
-  }
-
-  private getItemSpriteKey(itemId: string): string {
-    if (itemId.includes('sword') || itemId.includes('wand') || itemId.includes('staff')) return 'item_weapon';
-    if (itemId.includes('ring')) return 'item_ring';
-    if (itemId.includes('amulet')) return 'item_amulet';
-    if (itemId.includes('potion')) return 'item_potion';
-    return 'item_armor';
-  }
-
-  private createDroppedItem(item: any, key: string) {
-    const color = parseInt(item.color?.replace('#', '0x') || '0xffffff');
-    const spriteKey = this.getItemSpriteKey(item.itemId || '');
-
-    const glow = this.add.graphics();
-    glow.fillStyle(color, 0.25);
-    glow.fillCircle(0, 0, 14);
-
-    const image = this.add.image(0, 0, spriteKey);
-    image.setScale(16 / 32);
-
-    const container = this.add.container(item.x, item.y, [glow, image]);
-
-    this.itemSprites.set(key, { container, image, glow });
-
-    // Pulse effect on glow
-    this.tweens.add({
-      targets: glow,
-      alpha: 0.5,
-      scaleX: 1.3,
-      scaleY: 1.3,
-      duration: 800,
-      yoyo: true,
-      repeat: -1
-    });
-  }
-
-  private updateDroppedItem(item: any, key: string) {
-    const sprite = this.itemSprites.get(key);
-    if (sprite) {
-      sprite.container.setPosition(item.x, item.y);
-    }
-  }
-
-  private removeDroppedItem(key: string) {
-    const sprite = this.itemSprites.get(key);
-    if (sprite) {
-      sprite.container.destroy();
-      this.itemSprites.delete(key);
-    }
-  }
-
-  private createDroppedSkill(skill: any, key: string) {
-    const spriteKey = SKILL_SPRITES[skill.skillId] || 'flame_0';
-
-    const glow = this.add.graphics();
-    glow.fillStyle(0x00ffff, 0.3);
-    glow.fillCircle(0, 0, 16);
-
-    const image = this.add.image(0, 0, spriteKey);
-    image.setScale(20 / 32);
-
-    const container = this.add.container(skill.x, skill.y, [glow, image]);
-
-    this.droppedSkillSprites.set(key, { container, image, glow });
-
-    this.tweens.add({
-      targets: glow,
-      alpha: 0.6,
-      scaleX: 1.4,
-      scaleY: 1.4,
-      duration: 700,
-      yoyo: true,
-      repeat: -1
-    });
-  }
-
-  private updateDroppedSkill(skill: any, key: string) {
-    const sprite = this.droppedSkillSprites.get(key);
-    if (sprite) {
-      sprite.container.setPosition(skill.x, skill.y);
-    }
-  }
-
-  private removeDroppedSkill(key: string) {
-    const sprite = this.droppedSkillSprites.get(key);
-    if (sprite) {
-      sprite.container.destroy();
-      this.droppedSkillSprites.delete(key);
-    }
   }
 
   private showDeathScreen() {
@@ -736,72 +414,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private togglePause() {
-    if (this.pauseOverlay) {
-      this.hidePause();
-    } else {
-      this.showPause();
-    }
-  }
-
-  private showPause() {
-    if (this.pauseOverlay) return;
-    const { width, height } = this.cameras.main;
-
-    const bg = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
-    bg.setScrollFactor(0);
-    bg.setInteractive(); // block clicks through
-
-    const title = this.add.text(width / 2, height / 2 - 60, 'PAUSED', {
-      fontSize: '48px',
-      color: '#ffffff',
-      fontFamily: '"Courier New", monospace',
-      fontStyle: 'bold',
-    });
-    title.setOrigin(0.5);
-    title.setScrollFactor(0);
-
-    const resumeBtn = this.add.text(width / 2, height / 2 + 10, '[ RESUME ]', {
-      fontSize: '24px',
-      color: '#88ff88',
-      fontFamily: '"Courier New", monospace',
-      backgroundColor: '#1a1a2e',
-      padding: { x: 20, y: 10 },
-    });
-    resumeBtn.setOrigin(0.5);
-    resumeBtn.setScrollFactor(0);
-    resumeBtn.setInteractive({ useHandCursor: true });
-    resumeBtn.on('pointerover', () => resumeBtn.setColor('#aaffaa'));
-    resumeBtn.on('pointerout', () => resumeBtn.setColor('#88ff88'));
-    resumeBtn.on('pointerdown', () => this.hidePause());
-
-    const quitBtn = this.add.text(width / 2, height / 2 + 70, '[ QUIT ]', {
-      fontSize: '24px',
-      color: '#ff6644',
-      fontFamily: '"Courier New", monospace',
-      backgroundColor: '#1a1a2e',
-      padding: { x: 20, y: 10 },
-    });
-    quitBtn.setOrigin(0.5);
-    quitBtn.setScrollFactor(0);
-    quitBtn.setInteractive({ useHandCursor: true });
-    quitBtn.on('pointerover', () => quitBtn.setColor('#ffaa88'));
-    quitBtn.on('pointerout', () => quitBtn.setColor('#ff6644'));
-    quitBtn.on('pointerdown', () => this.quitToMenu());
-
-    this.pauseOverlay = this.add.container(0, 0, [bg, title, resumeBtn, quitBtn]);
-    this.pauseOverlay.setDepth(3000);
-    this.pauseOverlay.setScrollFactor(0);
-  }
-
-  private hidePause() {
-    if (this.pauseOverlay) {
-      this.pauseOverlay.destroy();
-      this.pauseOverlay = undefined;
-    }
+    this.pauseOverlay.toggle();
   }
 
   private quitToMenu() {
-    this.hidePause();
+    this.pauseOverlay.hide();
 
     // Disconnect from server
     networkClient.disconnect();
@@ -813,17 +430,11 @@ export class GameScene extends Phaser.Scene {
     // Stop UIScene
     this.scene.stop('UIScene');
 
-    // Clean up sprites
-    this.playerSprites.forEach(s => s.container.destroy());
-    this.playerSprites.clear();
-    this.monsterSprites.forEach(s => s.container.destroy());
-    this.monsterSprites.clear();
-    this.projectileSprites.forEach(s => s.destroy());
-    this.projectileSprites.clear();
-    this.itemSprites.forEach(s => s.container.destroy());
-    this.itemSprites.clear();
-    this.droppedSkillSprites.forEach(s => s.container.destroy());
-    this.droppedSkillSprites.clear();
+    // Clean up renderers
+    this.playerRenderer.destroyAll();
+    this.monsterRenderer.destroyAll();
+    this.projectileRenderer.destroyAll();
+    this.itemRenderer.destroyAll();
 
     // Go back to menu
     this.scene.start('MenuScene');
