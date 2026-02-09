@@ -6,6 +6,11 @@ export class NetworkClient {
   public sessionId: string = "";
   private _ping: number = 0;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private _bytesIn: number = 0;
+  private _bytesOut: number = 0;
+  private _bytesInPerSec: number = 0;
+  private _bytesOutPerSec: number = 0;
+  private trafficInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     const host = window.location.hostname || "localhost";
@@ -24,6 +29,35 @@ export class NetworkClient {
     this.room.onMessage("pong", (message: { timestamp: number }) => {
       this._ping = Date.now() - message.timestamp;
     });
+
+    // Monkey-patch WebSocket to count incoming bytes
+    const ws = (this.room.connection as any).ws as WebSocket;
+    const origOnMessage = ws.onmessage;
+    ws.onmessage = (ev: MessageEvent) => {
+      if (ev.data instanceof ArrayBuffer) {
+        this._bytesIn += ev.data.byteLength;
+      } else if (typeof ev.data === 'string') {
+        this._bytesIn += ev.data.length;
+      } else if (ev.data instanceof Blob) {
+        this._bytesIn += ev.data.size;
+      }
+      if (origOnMessage) origOnMessage.call(ws, ev);
+    };
+
+    // Monkey-patch send to count outgoing bytes
+    const origSend = this.room.send.bind(this.room);
+    this.room.send = (type: string, message?: any) => {
+      // Estimate outgoing size: type string + JSON of message
+      this._bytesOut += type.length + (message ? JSON.stringify(message).length : 0) + 4;
+      origSend(type, message);
+    };
+
+    this.trafficInterval = setInterval(() => {
+      this._bytesInPerSec = this._bytesIn;
+      this._bytesOutPerSec = this._bytesOut;
+      this._bytesIn = 0;
+      this._bytesOut = 0;
+    }, 1000);
 
     this.pingInterval = setInterval(() => {
       this.room?.send("ping", { timestamp: Date.now() });
@@ -56,7 +90,19 @@ export class NetworkClient {
     return this._ping;
   }
 
+  get bytesInPerSec(): number {
+    return this._bytesInPerSec;
+  }
+
+  get bytesOutPerSec(): number {
+    return this._bytesOutPerSec;
+  }
+
   disconnect() {
+    if (this.trafficInterval) {
+      clearInterval(this.trafficInterval);
+      this.trafficInterval = null;
+    }
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
