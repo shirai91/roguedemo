@@ -6,6 +6,7 @@ interface MonsterSprite {
   hpBar: Phaser.GameObjects.Graphics;
   hpBg: Phaser.GameObjects.Graphics;
   glow?: Phaser.GameObjects.Graphics;
+  levelText: Phaser.GameObjects.Text;
 }
 
 export class MonsterRenderer {
@@ -40,13 +41,11 @@ export class MonsterRenderer {
     image.setScale(scale);
     children.push(image);
 
-    // Normal monsters get a subtle white border
-    if (!monster.rarity || monster.rarity === 'normal') {
-      const border = this.scene.add.graphics();
-      border.lineStyle(1, 0xffffff, 0.4);
-      border.strokeRect(-size / 2, -size / 2, size, size);
-      children.push(border);
-    }
+    const levelText = this.scene.add.text(-size / 2 - 2, -size / 2 - 10, `Lv${monster.level || 1}`, {
+      fontSize: '8px',
+      color: '#ffffff',
+    }).setOrigin(1, 0);
+    children.push(levelText);
 
     const hpBg = this.scene.add.graphics();
     hpBg.fillStyle(0x660000, 1);
@@ -61,7 +60,7 @@ export class MonsterRenderer {
 
     const container = this.scene.add.container(monster.x, monster.y, children);
 
-    this.sprites.set(key, { container, image, hpBar, hpBg, glow });
+    this.sprites.set(key, { container, image, hpBar, hpBg, glow, levelText });
   }
 
   update(monster: any, key: string): void {
