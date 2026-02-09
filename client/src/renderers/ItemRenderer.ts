@@ -101,6 +101,16 @@ export class ItemRenderer {
     }
   }
 
+  setItemVisible(key: string, visible: boolean): void {
+    const sprite = this.itemSprites.get(key);
+    if (sprite) sprite.container.setVisible(visible);
+  }
+
+  setSkillVisible(key: string, visible: boolean): void {
+    const sprite = this.skillSprites.get(key);
+    if (sprite) sprite.container.setVisible(visible);
+  }
+
   destroyAll(): void {
     this.itemSprites.forEach(s => s.container.destroy());
     this.itemSprites.clear();

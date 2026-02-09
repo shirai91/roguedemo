@@ -8,6 +8,9 @@ import { ItemRenderer } from '../renderers/ItemRenderer';
 import { MapRenderer } from '../renderers/MapRenderer';
 import { PauseOverlay } from '../ui/PauseOverlay';
 
+const VISIBILITY_RADIUS = 400;
+const VISIBILITY_RADIUS_SQ = VISIBILITY_RADIUS * VISIBILITY_RADIUS;
+
 export class GameScene extends Phaser.Scene {
   private playerRenderer!: PlayerRenderer;
   private monsterRenderer!: MonsterRenderer;
@@ -458,7 +461,39 @@ export class GameScene extends Phaser.Scene {
     this.monsterRenderer.interpolate(delta);
     this.projectileRenderer.interpolate(delta);
 
-    const player = networkClient.room.state.players.get(networkClient.sessionId);
+    // Fog of war: hide entities beyond visibility radius
+    const localPlayer = networkClient.room.state.players.get(networkClient.sessionId);
+    if (localPlayer) {
+      const px = localPlayer.x;
+      const py = localPlayer.y;
+
+      networkClient.room.state.monsters.forEach((monster: any, key: string) => {
+        const dx = monster.x - px;
+        const dy = monster.y - py;
+        this.monsterRenderer.setVisible(key, dx * dx + dy * dy <= VISIBILITY_RADIUS_SQ);
+      });
+
+      networkClient.room.state.projectiles.forEach((proj: any, key: string) => {
+        if (!proj.isMonsterProjectile) return; // player projectiles always visible
+        const dx = proj.x - px;
+        const dy = proj.y - py;
+        this.projectileRenderer.setVisible(key, dx * dx + dy * dy <= VISIBILITY_RADIUS_SQ);
+      });
+
+      networkClient.room.state.droppedItems.forEach((item: any, key: string) => {
+        const dx = item.x - px;
+        const dy = item.y - py;
+        this.itemRenderer.setItemVisible(key, dx * dx + dy * dy <= VISIBILITY_RADIUS_SQ);
+      });
+
+      networkClient.room.state.droppedSkills.forEach((skill: any, key: string) => {
+        const dx = skill.x - px;
+        const dy = skill.y - py;
+        this.itemRenderer.setSkillVisible(key, dx * dx + dy * dy <= VISIBILITY_RADIUS_SQ);
+      });
+    }
+
+    const player = localPlayer;
     if (!player || player.isDead) {
       // Don't send input if dead
       return;

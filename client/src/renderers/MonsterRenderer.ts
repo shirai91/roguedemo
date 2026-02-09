@@ -112,6 +112,11 @@ export class MonsterRenderer {
     });
   }
 
+  setVisible(key: string, visible: boolean): void {
+    const sprite = this.sprites.get(key);
+    if (sprite) sprite.container.setVisible(visible);
+  }
+
   destroyAll(): void {
     this.sprites.forEach(s => s.container.destroy());
     this.sprites.clear();

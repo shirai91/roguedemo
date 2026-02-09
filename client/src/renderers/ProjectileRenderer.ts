@@ -79,6 +79,11 @@ export class ProjectileRenderer {
     this.targets.delete(key);
   }
 
+  setVisible(key: string, visible: boolean): void {
+    const sprite = this.sprites.get(key);
+    if (sprite) sprite.setVisible(visible);
+  }
+
   destroyAll(): void {
     this.sprites.forEach(s => s.destroy());
     this.sprites.clear();
