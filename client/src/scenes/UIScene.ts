@@ -5,6 +5,7 @@ import { InventoryPanel } from '../ui/InventoryPanel';
 import { SkillBar } from '../ui/SkillBar';
 import { DeathOverlay } from '../ui/DeathOverlay';
 import { MenuIcon } from '../ui/MenuIcon';
+import { DebugPanel } from '../ui/DebugPanel';
 
 export class UIScene extends Phaser.Scene {
   private hpBar!: HpBar;
@@ -12,6 +13,7 @@ export class UIScene extends Phaser.Scene {
   private skillBar!: SkillBar;
   private deathOverlay!: DeathOverlay;
   private menuIcon!: MenuIcon;
+  private debugPanel!: DebugPanel;
 
   private playerCountText!: Phaser.GameObjects.Text;
   private nearbyItemText!: Phaser.GameObjects.Text;
@@ -47,6 +49,9 @@ export class UIScene extends Phaser.Scene {
     this.menuIcon = new MenuIcon(this);
     this.menuIcon.create();
 
+    this.debugPanel = new DebugPanel(this);
+    this.debugPanel.create();
+
     this.createNearbyItemIndicator();
     this.createPlayerCount();
     this.createMinimap();
@@ -72,6 +77,7 @@ export class UIScene extends Phaser.Scene {
     this.events.off('updatePlayer', this.handlePlayerUpdate, this);
     this.scale.off('resize', this.handleResize, this);
     this.events.off('shutdown', this.cleanup, this);
+    this.debugPanel.destroy();
     this.playerData = null;
     this.nearestItem = null;
   }
@@ -174,6 +180,9 @@ export class UIScene extends Phaser.Scene {
 
     // Update death overlay if visible
     this.deathOverlay.handleResize(gameSize.width, gameSize.height);
+
+    // Update debug panel position
+    this.debugPanel.reposition();
   }
 
   update() {
