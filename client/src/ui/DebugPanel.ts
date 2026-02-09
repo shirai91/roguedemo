@@ -41,10 +41,7 @@ export class DebugPanel {
     const fps = Math.round(game.loop.actualFps);
     const frameTime = (1000 / game.loop.actualFps).toFixed(1);
 
-    const inKB = (networkClient.bytesInPerSec / 1024).toFixed(1);
-    const outKB = (networkClient.bytesOutPerSec / 1024).toFixed(1);
-
-    let lines = `FPS: ${fps}\nFrame: ${frameTime}ms\nPing: ${networkClient.ping}ms\nIn: ${inKB} KB/s | Out: ${outKB} KB/s`;
+    let lines = `FPS: ${fps}\nFrame: ${frameTime}ms\nPing: ${networkClient.ping}ms`;
 
     const perf = performance as any;
     if (perf.memory) {
