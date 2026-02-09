@@ -220,7 +220,7 @@ export class GameRoom extends Room<GameState> {
     player.maxHp = PLAYER_BASE_HP;
     player.moveSpeed = PLAYER_BASE_SPEED;
     player.attackSpeed = PLAYER_BASE_ATTACK_SPEED;
-    player.rawAttack = 10;
+    player.rawAttack = 7;
     player.level = 1;
     player.xp = 0;
     player.xpToNext = 100;
@@ -414,7 +414,7 @@ export class GameRoom extends Room<GameState> {
           // Attack
           const cooldown = 1000 / monsterType.attackSpeed;
           if (now - monsterState.lastAttackTime >= cooldown) {
-            this.damagePlayer(monsterState.targetPlayerId!, monsterType.baseDamage * monster.level, monsterType.damageType);
+            this.damagePlayer(monsterState.targetPlayerId!, monsterType.baseDamage * (1 + (monster.level - 1) * 0.1), monsterType.damageType);
             monsterState.lastAttackTime = now;
           }
         } else {
@@ -502,7 +502,7 @@ export class GameRoom extends Room<GameState> {
     monster.monsterType = monsterType.type;
     monster.level = level;
     monster.rarity = rarity;
-    monster.maxHp = monsterType.baseHp * level * rarityMultiplier;
+    monster.maxHp = Math.round(monsterType.baseHp * (1 + (level - 1) * 0.1) * rarityMultiplier);
     monster.hp = monster.maxHp;
     monster.state = "patrol";
     monster.size = monsterType.size;
@@ -583,6 +583,7 @@ export class GameRoom extends Room<GameState> {
     }
 
     baseDamage *= (1 + player.increasedDamage / 100);
+    baseDamage *= (1 + (player.level - 1) * 0.1);
 
     return baseDamage;
   }
@@ -632,8 +633,8 @@ export class GameRoom extends Room<GameState> {
           player.level++;
           player.maxHp += 20;
           player.hp = player.maxHp;
-          player.rawAttack += 2;
-          player.rawSpell += 2;
+          player.rawAttack += 1;
+          player.rawSpell += 1;
           player.xpToNext = 100 * player.level;
         }
       }
@@ -777,8 +778,9 @@ export class GameRoom extends Room<GameState> {
     // Reset to base stats
     player.moveSpeed = PLAYER_BASE_SPEED;
     player.attackSpeed = PLAYER_BASE_ATTACK_SPEED;
-    player.rawAttack = 10 + (player.level - 1) * 2;
-    player.rawSpell = (player.level - 1) * 2;
+    player.maxHp = PLAYER_BASE_HP + (player.level - 1) * 20;
+    player.rawAttack = 7 + (player.level - 1) * 1;
+    player.rawSpell = (player.level - 1) * 1;
     player.increasedDamage = 0;
     player.armour = 0;
     player.magicRes = 0;
