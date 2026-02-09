@@ -87,19 +87,19 @@ export class SkillBar {
       const plusBg = slot.getAt(3) as Phaser.GameObjects.Rectangle;
       const plusText = slot.getAt(4) as Phaser.GameObjects.Text;
 
-      // Remove old icon if exists (index 5+)
-      while (slot.length > 5) {
-        const old = slot.getAt(5);
-        old.destroy();
-        slot.removeAt(5);
-      }
-
       if (skill && skill.skillId) {
         const stateKey = `${skill.skillId}:${skill.level}:${skillPoints}`;
         const changed = this.lastSkillState[i] !== stateKey;
         this.lastSkillState[i] = stateKey;
 
         if (!changed) continue;
+
+        // Remove old icon if exists (index 5+)
+        while (slot.length > 5) {
+          const old = slot.getAt(5);
+          old.destroy();
+          slot.removeAt(5);
+        }
 
         const spriteKey = SKILL_SPRITES[skill.skillId] || 'flame_0';
         const icon = this.scene.add.image(0, 0, spriteKey);
@@ -119,6 +119,11 @@ export class SkillBar {
       } else {
         if (this.lastSkillState[i] !== '') {
           this.lastSkillState[i] = '';
+          while (slot.length > 5) {
+            const old = slot.getAt(5);
+            old.destroy();
+            slot.removeAt(5);
+          }
           slotLabel.setText('');
           levelText.setText('');
           plusBg.setVisible(false);
