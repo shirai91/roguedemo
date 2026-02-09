@@ -10,6 +10,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    allowedHosts: ['roguedemo.funnysolodev2026.win'],
     open: true,
   },
   build: {
