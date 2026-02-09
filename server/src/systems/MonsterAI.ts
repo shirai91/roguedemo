@@ -6,6 +6,7 @@ import { CombatSystem } from "./CombatSystem";
 
 export class MonsterAI {
   private monsterIdCounter = 0;
+  private pendingRespawns: { deathTime: number }[] = [];
 
   private getAvgPlayerLevel(state: GameState): number {
     let totalLevel = 0;
@@ -68,32 +69,20 @@ export class MonsterAI {
     });
   }
 
-  respawnMonster(monsterId: string, state: GameState, monsterStates: Map<string, MonsterState>) {
-    const monster = state.monsters.get(monsterId);
-    if (!monster) return;
+  queueRespawn() {
+    this.pendingRespawns.push({ deathTime: Date.now() });
+  }
 
-    const monsterType = MONSTER_TYPES.find(t => t.type === monster.monsterType);
-    if (!monsterType) return;
-
-    // Re-roll level based on current avg player level
-    const level = this.getMonsterLevel(state);
-    const rarityMultiplier = monster.rarity === "rare" ? 2.5 : monster.rarity === "magic" ? 1.5 : 1.0;
-    monster.level = level;
-    monster.maxHp = Math.round(monsterType.baseHp * (1 + (level - 1) * 0.1) * rarityMultiplier);
-
-    // Reset monster
-    monster.x = Math.random() * MAP_WIDTH;
-    monster.y = Math.random() * MAP_HEIGHT;
-    monster.hp = monster.maxHp;
-    monster.state = "patrol";
-
-    const monsterState = monsterStates.get(monsterId);
-    if (monsterState) {
-      monsterState.patrolTargetX = Math.random() * MAP_WIDTH;
-      monsterState.patrolTargetY = Math.random() * MAP_HEIGHT;
-      monsterState.targetPlayerId = null;
-      monsterState.lastAttackTime = 0;
+  private processPendingRespawns(now: number, state: GameState, monsterStates: Map<string, MonsterState>) {
+    const remaining: { deathTime: number }[] = [];
+    for (const entry of this.pendingRespawns) {
+      if (now - entry.deathTime >= MONSTER_RESPAWN_DELAY) {
+        this.spawnMonster(state, monsterStates);
+      } else {
+        remaining.push(entry);
+      }
     }
+    this.pendingRespawns = remaining;
   }
 
   private monsterProjectileIdCounter = 0;
@@ -128,17 +117,12 @@ export class MonsterAI {
   }
 
   updateMonsters(dt: number, now: number, state: GameState, monsterStates: Map<string, MonsterState>, playerStates: Map<string, PlayerState>, projectileStates: Map<string, ProjectileState>) {
+    // Process pending respawns
+    this.processPendingRespawns(now, state, monsterStates);
+
     state.monsters.forEach((monster, monsterId) => {
       const monsterState = monsterStates.get(monsterId);
       if (!monsterState) return;
-
-      // Handle respawn
-      if (monster.hp <= 0) {
-        if (now - monsterState.deathTime >= MONSTER_RESPAWN_DELAY) {
-          this.respawnMonster(monsterId, state, monsterStates);
-        }
-        return;
-      }
 
       const monsterType = MONSTER_TYPES.find(t => t.type === monster.monsterType);
       if (!monsterType) return;

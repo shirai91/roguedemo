@@ -54,11 +54,6 @@ export class CombatSystem {
     if (monster.hp <= 0) {
       monster.hp = 0;
 
-      const monsterState = monsterStates.get(monsterId);
-      if (monsterState) {
-        monsterState.deathTime = Date.now();
-      }
-
       // Give XP
       const player = state.players.get(attackerId);
       if (player) {
@@ -96,6 +91,10 @@ export class CombatSystem {
       if (Math.random() < skillDropChance) {
         lootSystem.dropRandomSkill(monster.x, monster.y, state);
       }
+
+      // Remove monster immediately so it disappears on clients
+      state.monsters.delete(monsterId);
+      monsterStates.delete(monsterId);
     }
   }
 

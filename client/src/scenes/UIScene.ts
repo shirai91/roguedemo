@@ -185,8 +185,21 @@ export class UIScene extends Phaser.Scene {
 
     // Check for nearby items
     const player = networkClient.room.state.players.get(networkClient.sessionId);
-    if (player && !player.isDead) {
-      this.checkNearbyItems(player);
+    if (player) {
+      // Check for death (fallback in case onChange doesn't trigger handlePlayerUpdate)
+      const isDead = player.isDead || player.hp <= 0;
+      if (isDead && !this.deathOverlay.isVisible) {
+        this.deathOverlay.show();
+      } else if (!isDead && this.deathOverlay.isVisible) {
+        this.deathOverlay.hide();
+      }
+
+      if (!isDead) {
+        this.checkNearbyItems(player);
+      } else {
+        this.nearbyItemText.setVisible(false);
+        this.nearestItem = null;
+      }
     } else {
       this.nearbyItemText.setVisible(false);
       this.nearestItem = null;

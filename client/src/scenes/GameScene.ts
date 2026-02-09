@@ -326,7 +326,10 @@ export class GameScene extends Phaser.Scene {
 
       // If this is the local player, follow with camera
       if (isLocal) {
-        this.cameras.main.startFollow(this.playerRenderer.getContainer(key) as Phaser.GameObjects.GameObject);
+        const container = this.playerRenderer.getContainer(key);
+        if (container) {
+          this.cameras.main.startFollow(container, true, 0.1, 0.1);
+        }
         this.updateUIPlayer(player);
       }
     });
