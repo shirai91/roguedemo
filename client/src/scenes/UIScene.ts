@@ -370,7 +370,7 @@ export class UIScene extends Phaser.Scene {
     // Find first empty equipment slot
     const equipment = this.playerData.equipment || [];
     for (let i = 0; i < 6; i++) {
-      if (!equipment[i]) {
+      if (!equipment[i] || !equipment[i].itemId) {
         networkClient.sendEquip(inventoryIndex, i);
         return;
       }
