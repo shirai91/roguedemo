@@ -14,7 +14,7 @@ export class UIScene extends Phaser.Scene {
   private playerCountText!: Phaser.GameObjects.Text;
 
   private equipmentSlots: Phaser.GameObjects.Container[] = [];
-  private equipmentItems: (Phaser.GameObjects.Rectangle | null)[] = [];
+  private equipmentItems: (Phaser.GameObjects.Image | null)[] = [];
 
   private inventoryContainer!: Phaser.GameObjects.Container;
   private inventoryVisible = false;
@@ -306,6 +306,14 @@ export class UIScene extends Phaser.Scene {
     }
   }
 
+  private getItemSpriteKey(itemId: string): string {
+    if (itemId.includes('sword') || itemId.includes('wand') || itemId.includes('staff')) return 'item_weapon';
+    if (itemId.includes('ring')) return 'item_ring';
+    if (itemId.includes('amulet')) return 'item_amulet';
+    if (itemId.includes('potion')) return 'item_potion';
+    return 'item_armor';
+  }
+
   private updateEquipment(equipment: any[]) {
     for (let i = 0; i < 6; i++) {
       const slot = this.equipmentSlots[i];
@@ -319,12 +327,12 @@ export class UIScene extends Phaser.Scene {
 
       // Add new item visual (check itemId to distinguish from empty placeholder)
       if (item && item.itemId) {
-        const color = parseInt((item.color || '#ffffff').replace('#', '0x'));
-        const itemRect = this.add.rectangle(0, -5, 30, 30, color);
-        itemRect.setStrokeStyle(1, 0xffffff);
+        const spriteKey = this.getItemSpriteKey(item.itemId);
+        const itemImage = this.add.image(0, -5, spriteKey);
+        itemImage.setScale(30 / 32);
 
-        slot.add(itemRect);
-        this.equipmentItems[i] = itemRect;
+        slot.add(itemImage);
+        this.equipmentItems[i] = itemImage;
       }
     }
   }
@@ -340,9 +348,9 @@ export class UIScene extends Phaser.Scene {
       // Add new item visual
       const item = inventory[index];
       if (item && item.itemId) {
-        const color = parseInt((item.color || '#ffffff').replace('#', '0x'));
-        const itemRect = this.add.rectangle(0, 0, 40, 40, color);
-        itemRect.setStrokeStyle(2, 0xffffff);
+        const spriteKey = this.getItemSpriteKey(item.itemId);
+        const itemImage = this.add.image(0, 0, spriteKey);
+        itemImage.setScale(40 / 32);
 
         // Tier indicator
         const tierText = this.add.text(15, 15, `T${item.tier || 1}`, {
@@ -352,7 +360,7 @@ export class UIScene extends Phaser.Scene {
         });
         tierText.setOrigin(1, 1);
 
-        slot.add([itemRect, tierText]);
+        slot.add([itemImage, tierText]);
       }
     });
   }
