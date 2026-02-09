@@ -40,16 +40,6 @@ export class MovementSystem {
       player.x = Math.max(0, Math.min(MAP_WIDTH, player.x));
       player.y = Math.max(0, Math.min(MAP_HEIGHT, player.y));
 
-      // Shooting - client sends angle directly
-      if (input.shooting) {
-        const cooldown = 1000 / player.attackSpeed;
-        if (now - playerState.lastShootTime >= cooldown) {
-          const targetX = player.x + Math.cos(input.angle) * 100;
-          const targetY = player.y + Math.sin(input.angle) * 100;
-          this.createProjectile(player.x, player.y, targetX, targetY, sessionId, "attack", true, state, projectileStates);
-          playerState.lastShootTime = now;
-        }
-      }
     });
   }
 
