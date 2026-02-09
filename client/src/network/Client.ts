@@ -35,6 +35,10 @@ export class NetworkClient {
     this.room?.send("unequip", { slotIndex });
   }
 
+  sendLevelSkill(slotIndex: number) {
+    this.room?.send("levelSkill", { slotIndex });
+  }
+
   disconnect() {
     if (this.room) {
       this.room.leave();

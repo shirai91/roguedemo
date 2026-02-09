@@ -2,6 +2,18 @@ import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
 
 // ALL schemas in ONE file to avoid circular dependencies
 
+export class PlayerSkill extends Schema {
+  @type("string") skillId: string = "";
+  @type("uint8") level: number = 1;
+}
+
+export class DroppedSkill extends Schema {
+  @type("string") instanceId: string = "";
+  @type("string") skillId: string = "";
+  @type("float32") x: number = 0;
+  @type("float32") y: number = 0;
+}
+
 // Stats stored on items
 export class ItemStats extends Schema {
   @type("float32") move_speed: number = 0;
@@ -47,6 +59,9 @@ export class Player extends Schema {
   // Equipment: 6 slots
   @type([InventoryItem]) equipment = new ArraySchema<InventoryItem>();
   @type([InventoryItem]) inventory = new ArraySchema<InventoryItem>();
+  // Skills: max 5
+  @type([PlayerSkill]) skills = new ArraySchema<PlayerSkill>();
+  @type("uint16") skillPoints: number = 0;
 }
 
 export class Monster extends Schema {
@@ -70,6 +85,7 @@ export class Projectile extends Schema {
   @type("string") ownerId: string = "";
   @type("string") damageType: string = "attack";
   @type("boolean") isPlayerProjectile: boolean = true;
+  @type("string") skillId: string = "";
 }
 
 export class DroppedItem extends Schema {
@@ -87,4 +103,5 @@ export class GameState extends Schema {
   @type({ map: Monster }) monsters = new MapSchema<Monster>();
   @type({ map: Projectile }) projectiles = new MapSchema<Projectile>();
   @type({ map: DroppedItem }) droppedItems = new MapSchema<DroppedItem>();
+  @type({ map: DroppedSkill }) droppedSkills = new MapSchema<DroppedSkill>();
 }

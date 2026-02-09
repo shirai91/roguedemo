@@ -5,6 +5,17 @@ const MAP_WIDTH = 3000;
 const MAP_HEIGHT = 3000;
 const GRID_SIZE = 100;
 
+const SKILL_SPRITES: Record<string, string> = {
+  fireball: 'flame_0', ice_shard: 'icicle_0', lightning_bolt: 'zap_0',
+  poison_arrow: 'poison_arrow_0', crystal_spear: 'crystal_spear_0',
+  magic_dart: 'magic_dart_0', iron_shot: 'iron_shot_0', acid_venom: 'acid_venom',
+  searing_ray: 'searing_ray_0', holy_arrow: 'arrow_0', sandblast: 'sandblast_0',
+  sting: 'sting_0', stone_arrow: 'stone_arrow_0', frost_nova: 'frost_0',
+  javelin_throw: 'javelin_0_new', magic_bolt: 'magic_bolt_1',
+  divine_judgment: 'goldaura_0', crossbow_bolt: 'crossbow_bolt_0',
+  soul_drain: 'drain_0_new', chaos_orb: 'orb_glow_0',
+};
+
 interface PlayerSprite {
   container: Phaser.GameObjects.Container;
   image: Phaser.GameObjects.Image;
@@ -27,11 +38,18 @@ interface ItemSprite {
   glow: Phaser.GameObjects.Graphics;
 }
 
+interface SkillSprite {
+  container: Phaser.GameObjects.Container;
+  image: Phaser.GameObjects.Image;
+  glow: Phaser.GameObjects.Graphics;
+}
+
 export class GameScene extends Phaser.Scene {
   private playerSprites: Map<string, PlayerSprite> = new Map();
   private monsterSprites: Map<string, MonsterSprite> = new Map();
-  private projectileSprites: Map<string, Phaser.GameObjects.Arc> = new Map();
+  private projectileSprites: Map<string, Phaser.GameObjects.Arc | Phaser.GameObjects.Image> = new Map();
   private itemSprites: Map<string, ItemSprite> = new Map();
+  private droppedSkillSprites: Map<string, SkillSprite> = new Map();
 
   private gridGraphics!: Phaser.GameObjects.Graphics;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -82,6 +100,17 @@ export class GameScene extends Phaser.Scene {
 
     // Dungeon
     this.load.image('floor', 'sprites/dungeon/floor.png');
+
+    // Skill effect sprites
+    const skillSprites = [
+      'flame_0', 'icicle_0', 'zap_0', 'poison_arrow_0', 'crystal_spear_0',
+      'magic_dart_0', 'iron_shot_0', 'acid_venom', 'searing_ray_0', 'arrow_0',
+      'sandblast_0', 'sting_0', 'stone_arrow_0', 'frost_0', 'javelin_0_new',
+      'magic_bolt_1', 'goldaura_0', 'crossbow_bolt_0', 'drain_0_new', 'orb_glow_0'
+    ];
+    skillSprites.forEach(name => {
+      this.load.image(name, `sprites/${name}.png`);
+    });
   }
 
   async create() {
@@ -388,6 +417,19 @@ export class GameScene extends Phaser.Scene {
     room.state.droppedItems.onRemove((item: any, key: string) => {
       this.removeDroppedItem(key);
     });
+
+    // Dropped Skills
+    room.state.droppedSkills.onAdd((skill: any, key: string) => {
+      this.createDroppedSkill(skill, key);
+
+      skill.onChange(() => {
+        this.updateDroppedSkill(skill, key);
+      });
+    });
+
+    room.state.droppedSkills.onRemove((skill: any, key: string) => {
+      this.removeDroppedSkill(key);
+    });
   }
 
   private createPlayer(player: any, key: string) {
@@ -529,6 +571,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createProjectile(projectile: any, key: string) {
+    if (projectile.skillId) {
+      const spriteKey = SKILL_SPRITES[projectile.skillId];
+      if (spriteKey) {
+        const img = this.add.image(projectile.x, projectile.y, spriteKey);
+        img.setScale(16 / 32);
+        img.setRotation(projectile.angle);
+        this.projectileSprites.set(key, img);
+        return;
+      }
+    }
     const arc = this.add.arc(projectile.x, projectile.y, 4, 0, 360, false, 0xffffff);
     this.projectileSprites.set(key, arc);
   }
@@ -537,6 +589,9 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.projectileSprites.get(key);
     if (sprite) {
       sprite.setPosition(projectile.x, projectile.y);
+      if (sprite instanceof Phaser.GameObjects.Image) {
+        sprite.setRotation(projectile.angle);
+      }
     }
   }
 
@@ -595,6 +650,46 @@ export class GameScene extends Phaser.Scene {
     if (sprite) {
       sprite.container.destroy();
       this.itemSprites.delete(key);
+    }
+  }
+
+  private createDroppedSkill(skill: any, key: string) {
+    const spriteKey = SKILL_SPRITES[skill.skillId] || 'flame_0';
+
+    const glow = this.add.graphics();
+    glow.fillStyle(0x00ffff, 0.3);
+    glow.fillCircle(0, 0, 16);
+
+    const image = this.add.image(0, 0, spriteKey);
+    image.setScale(20 / 32);
+
+    const container = this.add.container(skill.x, skill.y, [glow, image]);
+
+    this.droppedSkillSprites.set(key, { container, image, glow });
+
+    this.tweens.add({
+      targets: glow,
+      alpha: 0.6,
+      scaleX: 1.4,
+      scaleY: 1.4,
+      duration: 700,
+      yoyo: true,
+      repeat: -1
+    });
+  }
+
+  private updateDroppedSkill(skill: any, key: string) {
+    const sprite = this.droppedSkillSprites.get(key);
+    if (sprite) {
+      sprite.container.setPosition(skill.x, skill.y);
+    }
+  }
+
+  private removeDroppedSkill(key: string) {
+    const sprite = this.droppedSkillSprites.get(key);
+    if (sprite) {
+      sprite.container.destroy();
+      this.droppedSkillSprites.delete(key);
     }
   }
 

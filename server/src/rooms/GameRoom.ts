@@ -1,5 +1,5 @@
 import { Room, Client } from "colyseus";
-import { GameState, Player, Monster, Projectile, DroppedItem, InventoryItem, ItemStats } from "../schemas/GameState";
+import { GameState, Player, Monster, Projectile, DroppedItem, InventoryItem, ItemStats, PlayerSkill, DroppedSkill } from "../schemas/GameState";
 
 // Game constants
 const MAP_WIDTH = 3000;
@@ -18,6 +18,44 @@ const INVENTORY_SIZE = 20;
 const MONSTER_RESPAWN_DELAY = 3000;
 const PLAYER_RESPAWN_DELAY = 5000;
 const ITEM_PICKUP_RANGE = 50;
+
+interface SkillDefinition {
+  id: string;
+  name: string;
+  damageType: "attack" | "spell" | "divine";
+  baseDamage: number;
+  cooldown: number;
+  projectileSpeed: number;
+  sprite: string;
+  description: string;
+}
+
+const SKILL_DEFINITIONS: SkillDefinition[] = [
+  { id: "fireball", name: "Fireball", damageType: "spell", baseDamage: 25, cooldown: 2000, projectileSpeed: 400, sprite: "flame_0.png", description: "Launches a fireball" },
+  { id: "ice_shard", name: "Ice Shard", damageType: "spell", baseDamage: 20, cooldown: 1500, projectileSpeed: 500, sprite: "icicle_0.png", description: "Fires an ice projectile" },
+  { id: "lightning_bolt", name: "Lightning Bolt", damageType: "spell", baseDamage: 35, cooldown: 3000, projectileSpeed: 700, sprite: "zap_0.png", description: "A bolt of lightning" },
+  { id: "poison_arrow", name: "Poison Arrow", damageType: "attack", baseDamage: 18, cooldown: 1200, projectileSpeed: 550, sprite: "poison_arrow_0.png", description: "Toxic projectile" },
+  { id: "crystal_spear", name: "Crystal Spear", damageType: "attack", baseDamage: 30, cooldown: 2500, projectileSpeed: 450, sprite: "crystal_spear_0.png", description: "Piercing crystal" },
+  { id: "magic_dart", name: "Magic Dart", damageType: "spell", baseDamage: 12, cooldown: 800, projectileSpeed: 600, sprite: "magic_dart_0.png", description: "Quick arcane bolt" },
+  { id: "iron_shot", name: "Iron Shot", damageType: "attack", baseDamage: 28, cooldown: 2200, projectileSpeed: 350, sprite: "iron_shot_0.png", description: "Heavy metal slug" },
+  { id: "acid_venom", name: "Acid Venom", damageType: "spell", baseDamage: 22, cooldown: 1800, projectileSpeed: 400, sprite: "acid_venom.png", description: "Corrosive spray" },
+  { id: "searing_ray", name: "Searing Ray", damageType: "spell", baseDamage: 32, cooldown: 2800, projectileSpeed: 650, sprite: "searing_ray_0.png", description: "Beam of heat" },
+  { id: "holy_arrow", name: "Holy Arrow", damageType: "divine", baseDamage: 24, cooldown: 2000, projectileSpeed: 500, sprite: "arrow_0.png", description: "Blessed arrow" },
+  { id: "sandblast", name: "Sandblast", damageType: "attack", baseDamage: 15, cooldown: 1000, projectileSpeed: 450, sprite: "sandblast_0.png", description: "Ground shrapnel" },
+  { id: "sting", name: "Sting", damageType: "spell", baseDamage: 10, cooldown: 600, projectileSpeed: 550, sprite: "sting_0.png", description: "Venomous sting" },
+  { id: "stone_arrow", name: "Stone Arrow", damageType: "attack", baseDamage: 20, cooldown: 1500, projectileSpeed: 500, sprite: "stone_arrow_0.png", description: "Hardened stone bolt" },
+  { id: "frost_nova", name: "Frost Nova", damageType: "spell", baseDamage: 28, cooldown: 2500, projectileSpeed: 350, sprite: "frost_0.png", description: "Burst of cold" },
+  { id: "javelin_throw", name: "Javelin Throw", damageType: "attack", baseDamage: 26, cooldown: 2000, projectileSpeed: 480, sprite: "javelin_0_new.png", description: "Thrown javelin" },
+  { id: "magic_bolt", name: "Magic Bolt", damageType: "spell", baseDamage: 22, cooldown: 1600, projectileSpeed: 520, sprite: "magic_bolt_1.png", description: "Pure arcane energy" },
+  { id: "divine_judgment", name: "Divine Judgment", damageType: "divine", baseDamage: 40, cooldown: 3500, projectileSpeed: 400, sprite: "goldaura_0.png", description: "Golden smite" },
+  { id: "crossbow_bolt", name: "Crossbow Bolt", damageType: "attack", baseDamage: 16, cooldown: 1000, projectileSpeed: 650, sprite: "crossbow_bolt_0.png", description: "Rapid bolt" },
+  { id: "soul_drain", name: "Soul Drain", damageType: "divine", baseDamage: 30, cooldown: 2800, projectileSpeed: 400, sprite: "drain_0_new.png", description: "Life steal bolt" },
+  { id: "chaos_orb", name: "Chaos Orb", damageType: "divine", baseDamage: 35, cooldown: 3000, projectileSpeed: 350, sprite: "orb_glow_0.png", description: "Chaotic energy" },
+];
+
+const SKILL_AUTO_CAST_RANGE = 300;
+const MAX_SKILLS = 5;
+const MAX_SKILL_LEVEL = 10;
 
 // Monster type definitions
 interface MonsterType {
@@ -168,6 +206,7 @@ interface ProjectileState {
 interface PlayerState {
   lastShootTime: number;
   deathTime: number;
+  skillCooldowns: Map<string, number>;
 }
 
 export class GameRoom extends Room<GameState> {
@@ -178,6 +217,7 @@ export class GameRoom extends Room<GameState> {
   private monsterIdCounter = 0;
   private projectileIdCounter = 0;
   private itemInstanceCounter = 0;
+  private skillInstanceCounter = 0;
 
   onCreate(options: any) {
     this.setState(new GameState());
@@ -204,6 +244,10 @@ export class GameRoom extends Room<GameState> {
 
     this.onMessage("unequip", (client, message) => {
       this.handleUnequip(client.sessionId, message.slotIndex);
+    });
+
+    this.onMessage("levelSkill", (client, message) => {
+      this.handleLevelSkill(client.sessionId, message.slotIndex);
     });
 
     // Start game loop
@@ -238,6 +282,7 @@ export class GameRoom extends Room<GameState> {
     this.playerStates.set(client.sessionId, {
       lastShootTime: 0,
       deathTime: 0,
+      skillCooldowns: new Map(),
     });
   }
 
@@ -336,9 +381,14 @@ export class GameRoom extends Room<GameState> {
         return;
       }
 
-      // Move projectile
-      const dx = Math.cos(projectile.angle) * PROJECTILE_SPEED * dt;
-      const dy = Math.sin(projectile.angle) * PROJECTILE_SPEED * dt;
+      // Move projectile (use skill-specific speed if applicable)
+      let projSpeed = PROJECTILE_SPEED;
+      if (projectile.skillId) {
+        const skillDef = SKILL_DEFINITIONS.find(s => s.id === projectile.skillId);
+        if (skillDef) projSpeed = skillDef.projectileSpeed;
+      }
+      const dx = Math.cos(projectile.angle) * projSpeed * dt;
+      const dy = Math.sin(projectile.angle) * projSpeed * dt;
 
       projectile.x += dx;
       projectile.y += dy;
@@ -452,6 +502,44 @@ export class GameRoom extends Room<GameState> {
       monster.y = Math.max(0, Math.min(MAP_HEIGHT, monster.y));
     });
 
+    // Skill auto-cast
+    this.state.players.forEach((player, sessionId) => {
+      if (player.isDead) return;
+      const playerState = this.playerStates.get(sessionId);
+      if (!playerState) return;
+
+      player.skills.forEach((playerSkill) => {
+        if (!playerSkill.skillId) return;
+
+        const skillDef = SKILL_DEFINITIONS.find(s => s.id === playerSkill.skillId);
+        if (!skillDef) return;
+
+        const lastFire = playerState.skillCooldowns.get(playerSkill.skillId) || 0;
+        if (now - lastFire < skillDef.cooldown) return;
+
+        // Find nearest monster in range
+        let nearestMonster: Monster | null = null;
+        let nearestDist = Infinity;
+
+        this.state.monsters.forEach((monster) => {
+          if (monster.hp <= 0) return;
+          const dist = this.distance(player.x, player.y, monster.x, monster.y);
+          if (dist < nearestDist && dist <= SKILL_AUTO_CAST_RANGE) {
+            nearestDist = dist;
+            nearestMonster = monster;
+          }
+        });
+
+        if (!nearestMonster) return;
+
+        // Fire skill projectile
+        const nm = nearestMonster as Monster;
+        const skillDamage = skillDef.baseDamage * (1 + (playerSkill.level - 1) * 0.1);
+        this.createSkillProjectile(player.x, player.y, nm.x, nm.y, sessionId, skillDef, skillDamage);
+        playerState.skillCooldowns.set(playerSkill.skillId, now);
+      });
+    });
+
     // Check item pickups
     this.state.players.forEach((player, sessionId) => {
       if (player.isDead) return;
@@ -468,6 +556,31 @@ export class GameRoom extends Room<GameState> {
               this.state.droppedItems.delete(instanceId);
             }
           }
+        }
+      });
+    });
+
+    // Check skill pickups (auto-pickup)
+    this.state.players.forEach((player, sessionId) => {
+      if (player.isDead) return;
+
+      this.state.droppedSkills.forEach((droppedSkill, instanceId) => {
+        const dist = this.distance(player.x, player.y, droppedSkill.x, droppedSkill.y);
+        if (dist <= ITEM_PICKUP_RANGE) {
+          // Check max 5 skills
+          if (player.skills.length >= MAX_SKILLS) return;
+          // Check no duplicates
+          let hasDuplicate = false;
+          player.skills.forEach((ps) => {
+            if (ps.skillId === droppedSkill.skillId) hasDuplicate = true;
+          });
+          if (hasDuplicate) return;
+
+          const newSkill = new PlayerSkill();
+          newSkill.skillId = droppedSkill.skillId;
+          newSkill.level = 1;
+          player.skills.push(newSkill);
+          this.state.droppedSkills.delete(instanceId);
         }
       });
     });
@@ -571,6 +684,27 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
+  createSkillProjectile(x: number, y: number, targetX: number, targetY: number, ownerId: string, skillDef: SkillDefinition, damage: number) {
+    const projectileId = `projectile_${this.projectileIdCounter++}`;
+    const angle = Math.atan2(targetY - y, targetX - x);
+
+    const projectile = new Projectile();
+    projectile.x = x;
+    projectile.y = y;
+    projectile.angle = angle;
+    projectile.ownerId = ownerId;
+    projectile.damageType = skillDef.damageType;
+    projectile.isPlayerProjectile = true;
+    projectile.skillId = skillDef.id;
+
+    this.state.projectiles.set(projectileId, projectile);
+
+    this.projectileStates.set(projectileId, {
+      createdAt: Date.now(),
+      damage: damage,
+    });
+  }
+
   calculatePlayerDamage(player: Player, damageType: string): number {
     let baseDamage = 0;
 
@@ -631,6 +765,7 @@ export class GameRoom extends Room<GameState> {
         while (player.xp >= player.xpToNext) {
           player.xp -= player.xpToNext;
           player.level++;
+          player.skillPoints += 1;
           player.maxHp += 20;
           player.hp = player.maxHp;
           player.rawAttack += 1;
@@ -652,6 +787,13 @@ export class GameRoom extends Room<GameState> {
           const itemDef = tierItems[Math.floor(Math.random() * tierItems.length)];
           this.dropItem(itemDef.id, monster.x, monster.y);
         }
+      }
+
+      // Drop skill
+      const skillDropChance = monster.rarity === "rare" ? 0.4 : monster.rarity === "magic" ? 0.2 : 0.1;
+      if (Math.random() < skillDropChance) {
+        const skillDef = SKILL_DEFINITIONS[Math.floor(Math.random() * SKILL_DEFINITIONS.length)];
+        this.dropSkill(skillDef.id, monster.x, monster.y);
       }
     }
   }
@@ -701,6 +843,16 @@ export class GameRoom extends Room<GameState> {
     droppedItem.color = itemDef.color;
 
     this.state.droppedItems.set(instanceId, droppedItem);
+  }
+
+  dropSkill(skillId: string, x: number, y: number) {
+    const instanceId = `skill_${this.skillInstanceCounter++}`;
+    const droppedSkill = new DroppedSkill();
+    droppedSkill.instanceId = instanceId;
+    droppedSkill.skillId = skillId;
+    droppedSkill.x = x + (Math.random() * 40 - 20);
+    droppedSkill.y = y + (Math.random() * 40 - 20);
+    this.state.droppedSkills.set(instanceId, droppedSkill);
   }
 
   handlePickup(playerId: string, instanceId: string) {
@@ -769,6 +921,20 @@ export class GameRoom extends Room<GameState> {
     player.equipment.setAt(equipmentSlot, empty);
 
     this.recalculateStats(playerId);
+  }
+
+  handleLevelSkill(playerId: string, slotIndex: number) {
+    const player = this.state.players.get(playerId);
+    if (!player || player.isDead) return;
+    if (slotIndex < 0 || slotIndex >= player.skills.length) return;
+    if (player.skillPoints <= 0) return;
+
+    const skill = player.skills[slotIndex];
+    if (!skill || !skill.skillId) return;
+    if (skill.level >= MAX_SKILL_LEVEL) return;
+
+    skill.level += 1;
+    player.skillPoints -= 1;
   }
 
   recalculateStats(playerId: string) {
