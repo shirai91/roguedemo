@@ -7,6 +7,7 @@ interface MonsterSprite {
   hpBg: Phaser.GameObjects.Graphics;
   glow?: Phaser.GameObjects.Graphics;
   levelText: Phaser.GameObjects.Text;
+  lastHp: number;
 }
 
 export class MonsterRenderer {
@@ -60,7 +61,7 @@ export class MonsterRenderer {
 
     const container = this.scene.add.container(monster.x, monster.y, children);
 
-    this.sprites.set(key, { container, image, hpBar, hpBg, glow, levelText });
+    this.sprites.set(key, { container, image, hpBar, hpBg, glow, levelText, lastHp: monster.hp });
   }
 
   update(monster: any, key: string): void {
@@ -68,6 +69,15 @@ export class MonsterRenderer {
     if (!sprite) return;
 
     sprite.container.setPosition(monster.x, monster.y);
+
+    // Damage flash
+    if (monster.hp < sprite.lastHp) {
+      sprite.image.setTint(0xff0000);
+      this.scene.time.delayedCall(150, () => {
+        sprite.image.clearTint();
+      });
+    }
+    sprite.lastHp = monster.hp;
 
     // Update HP bar
     const size = monster.size || 20;

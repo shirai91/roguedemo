@@ -61,16 +61,17 @@ export class MovementSystem {
         return;
       }
 
-      // Check lifetime
-      if (now - projectileState.createdAt >= PROJECTILE_LIFETIME) {
+      // Check lifetime (use per-projectile lifetime if set)
+      const lifetime = projectileState.lifetime ?? PROJECTILE_LIFETIME;
+      if (now - projectileState.createdAt >= lifetime) {
         state.projectiles.delete(id);
         projectileStates.delete(id);
         return;
       }
 
-      // Move projectile (use skill-specific speed if applicable)
-      let projSpeed = PROJECTILE_SPEED;
-      if (projectile.skillId) {
+      // Move projectile (use per-projectile speed, then skill-specific, then default)
+      let projSpeed = projectileState.speed ?? PROJECTILE_SPEED;
+      if (!projectileState.speed && projectile.skillId) {
         const skillDef = SKILL_DEFINITIONS.find(s => s.id === projectile.skillId);
         if (skillDef) projSpeed = skillDef.projectileSpeed;
       }
@@ -103,6 +104,17 @@ export class MovementSystem {
           if (otherId !== projectile.ownerId && !otherPlayer.isDead) {
             if (CombatSystem.checkCollision(projectile.x, projectile.y, 5, otherPlayer.x, otherPlayer.y, 20)) {
               CombatSystem.damagePlayer(otherId, projectileState.damage, projectile.damageType, state, playerStates);
+              state.projectiles.delete(id);
+              projectileStates.delete(id);
+            }
+          }
+        });
+      } else if (projectile.isMonsterProjectile) {
+        // Monster projectile vs players
+        state.players.forEach((player, playerId) => {
+          if (!player.isDead) {
+            if (CombatSystem.checkCollision(projectile.x, projectile.y, 5, player.x, player.y, 20)) {
+              CombatSystem.damagePlayer(playerId, projectileState.damage, projectile.damageType, state, playerStates);
               state.projectiles.delete(id);
               projectileStates.delete(id);
             }

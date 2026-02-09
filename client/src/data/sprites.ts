@@ -81,6 +81,12 @@ export const ITEM_SPRITE_KEYS = [
   'item_potion'
 ];
 
+export const MONSTER_PROJECTILE_SPRITE_KEYS = [
+  'rock_0',
+  'needle_0',
+  'stone_0',
+];
+
 export const SKILL_SPRITE_KEYS = [
   'flame_0',
   'icicle_0',
@@ -141,6 +147,11 @@ export function preloadAssets(scene: Phaser.Scene): void {
 
   // Skill effect sprites
   SKILL_SPRITE_KEYS.forEach(name => {
+    scene.load.image(name, `sprites/${name}.png`);
+  });
+
+  // Monster projectile sprites
+  MONSTER_PROJECTILE_SPRITE_KEYS.forEach(name => {
     scene.load.image(name, `sprites/${name}.png`);
   });
 }

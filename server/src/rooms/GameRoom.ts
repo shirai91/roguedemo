@@ -152,7 +152,7 @@ export class GameRoom extends Room<GameState> {
 
     this.movementSystem.updateProjectiles(dt, now, this.state, this.projectileStates, this.lootSystem, this.monsterStates, this.playerStates);
 
-    this.monsterAI.updateMonsters(dt, now, this.state, this.monsterStates, this.playerStates);
+    this.monsterAI.updateMonsters(dt, now, this.state, this.monsterStates, this.playerStates, this.projectileStates);
 
     this.skillSystem.updateSkillAutoCast(now, this.state, this.playerStates, this.movementSystem, this.projectileStates);
 

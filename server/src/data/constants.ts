@@ -39,6 +39,8 @@ export interface MonsterState {
 export interface ProjectileState {
   createdAt: number;
   damage: number;
+  speed?: number;
+  lifetime?: number;
 }
 
 export interface PlayerState {

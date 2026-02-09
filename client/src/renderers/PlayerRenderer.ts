@@ -6,6 +6,7 @@ interface PlayerSprite {
   nameText: Phaser.GameObjects.Text;
   hpBar: Phaser.GameObjects.Graphics;
   hpBg: Phaser.GameObjects.Graphics;
+  lastHp: number;
 }
 
 export class PlayerRenderer {
@@ -40,7 +41,7 @@ export class PlayerRenderer {
 
     const container = this.scene.add.container(player.x, player.y, [image, nameText, hpBg, hpBar]);
 
-    this.sprites.set(key, { container, image, nameText, hpBar, hpBg });
+    this.sprites.set(key, { container, image, nameText, hpBar, hpBg, lastHp: player.hp });
   }
 
   update(player: any, key: string): void {
@@ -48,6 +49,15 @@ export class PlayerRenderer {
     if (!sprite) return;
 
     sprite.container.setPosition(player.x, player.y);
+
+    // Damage flash
+    if (player.hp < sprite.lastHp) {
+      sprite.image.setTint(0xff0000);
+      this.scene.time.delayedCall(150, () => {
+        sprite.image.clearTint();
+      });
+    }
+    sprite.lastHp = player.hp;
 
     // Update HP bar
     sprite.hpBar.clear();

@@ -85,7 +85,9 @@ export class Projectile extends Schema {
   @type("string") ownerId: string = "";
   @type("string") damageType: string = "attack";
   @type("boolean") isPlayerProjectile: boolean = true;
+  @type("boolean") isMonsterProjectile: boolean = false;
   @type("string") skillId: string = "";
+  @type("string") spriteKey: string = "";
 }
 
 export class DroppedItem extends Schema {

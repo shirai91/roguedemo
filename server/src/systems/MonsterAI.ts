@@ -1,5 +1,5 @@
-import { GameState, Monster, Player } from "../schemas/GameState";
-import { MonsterState, PlayerState } from "../data/constants";
+import { GameState, Monster, Player, Projectile } from "../schemas/GameState";
+import { MonsterState, PlayerState, ProjectileState } from "../data/constants";
 import { MONSTER_TYPES, MonsterType } from "../data/monsters";
 import { MAP_WIDTH, MAP_HEIGHT, MONSTER_RESPAWN_DELAY, MAX_PLAYER_LEVEL } from "../data/constants";
 import { CombatSystem } from "./CombatSystem";
@@ -96,7 +96,38 @@ export class MonsterAI {
     }
   }
 
-  updateMonsters(dt: number, now: number, state: GameState, monsterStates: Map<string, MonsterState>, playerStates: Map<string, PlayerState>) {
+  private monsterProjectileIdCounter = 0;
+
+  private spawnMonsterProjectile(monster: Monster, monsterId: string, monsterType: MonsterType, targetPlayer: Player, level: number, state: GameState, projectileStates: Map<string, ProjectileState>) {
+    const projId = `mproj_${this.monsterProjectileIdCounter++}`;
+    const dx = targetPlayer.x - monster.x;
+    const dy = targetPlayer.y - monster.y;
+    const angle = Math.atan2(dy, dx);
+
+    const projectile = new Projectile();
+    projectile.x = monster.x;
+    projectile.y = monster.y;
+    projectile.angle = angle;
+    projectile.ownerId = monsterId;
+    projectile.damageType = monsterType.damageType;
+    projectile.isPlayerProjectile = false;
+    projectile.isMonsterProjectile = true;
+    projectile.spriteKey = monsterType.projectileSprite;
+
+    state.projectiles.set(projId, projectile);
+
+    const damage = monsterType.baseDamage * (1 + (level - 1) * 0.1);
+    const isMelee = monsterType.projectileSpeed >= 800;
+
+    projectileStates.set(projId, {
+      createdAt: Date.now(),
+      damage,
+      speed: monsterType.projectileSpeed,
+      lifetime: isMelee ? 400 : 2000,
+    });
+  }
+
+  updateMonsters(dt: number, now: number, state: GameState, monsterStates: Map<string, MonsterState>, playerStates: Map<string, PlayerState>, projectileStates: Map<string, ProjectileState>) {
     state.monsters.forEach((monster, monsterId) => {
       const monsterState = monsterStates.get(monsterId);
       if (!monsterState) return;
@@ -133,10 +164,10 @@ export class MonsterAI {
           .find(([_, p]) => p === nearestPlayer)?.[0] || null;
 
         if (nearestDistance <= monsterType.attackRange) {
-          // Attack
+          // Attack via projectile
           const cooldown = 1000 / monsterType.attackSpeed;
           if (now - monsterState.lastAttackTime >= cooldown) {
-            CombatSystem.damagePlayer(monsterState.targetPlayerId!, monsterType.baseDamage * (1 + (monster.level - 1) * 0.1), monsterType.damageType, state, playerStates);
+            this.spawnMonsterProjectile(monster, monsterId, monsterType, nearestPlayer as Player, monster.level, state, projectileStates);
             monsterState.lastAttackTime = now;
           }
         } else {
