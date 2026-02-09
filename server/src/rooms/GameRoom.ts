@@ -9,6 +9,7 @@ import {
   PLAYER_BASE_SPEED,
   PLAYER_BASE_ATTACK_SPEED,
   TICK_RATE,
+  PATCH_RATE,
   EQUIPMENT_SLOTS,
   PLAYER_RESPAWN_DELAY,
   ITEM_PICKUP_RANGE,
@@ -38,6 +39,7 @@ export class GameRoom extends Room<GameState> {
 
   onCreate(options: any) {
     this.setState(new GameState());
+    this.setPatchRate(PATCH_RATE);
 
     console.log("[GameRoom] Room created, spawning initial monsters");
 

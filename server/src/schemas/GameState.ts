@@ -10,8 +10,8 @@ export class PlayerSkill extends Schema {
 export class DroppedSkill extends Schema {
   @type("string") instanceId: string = "";
   @type("string") skillId: string = "";
-  @type("float32") x: number = 0;
-  @type("float32") y: number = 0;
+  @type("int16") x: number = 0;
+  @type("int16") y: number = 0;
 }
 
 // Stats stored on items
@@ -66,10 +66,10 @@ export class Player extends Schema {
 
 export class Monster extends Schema {
   @type("string") monsterId: string = "";
-  @type("float32") x: number = 0;
-  @type("float32") y: number = 0;
-  @type("float32") hp: number = 50;
-  @type("float32") maxHp: number = 50;
+  @type("int16") x: number = 0;
+  @type("int16") y: number = 0;
+  @type("uint16") hp: number = 50;
+  @type("uint16") maxHp: number = 50;
   @type("string") monsterType: string = "";
   @type("uint8") level: number = 1;
   @type("string") rarity: string = "normal";  // normal, magic, rare
@@ -79,8 +79,8 @@ export class Monster extends Schema {
 }
 
 export class Projectile extends Schema {
-  @type("float32") x: number = 0;
-  @type("float32") y: number = 0;
+  @type("int16") x: number = 0;
+  @type("int16") y: number = 0;
   @type("float32") angle: number = 0;
   @type("string") ownerId: string = "";
   @type("string") damageType: string = "attack";
@@ -95,8 +95,8 @@ export class DroppedItem extends Schema {
   @type("string") itemId: string = "";
   @type("string") name: string = "";
   @type("uint8") tier: number = 0;
-  @type("float32") x: number = 0;
-  @type("float32") y: number = 0;
+  @type("int16") x: number = 0;
+  @type("int16") y: number = 0;
   @type("string") color: string = "#ffffff";
 }
 
