@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { networkClient } from '../network/Client';
 
 export class DebugPanel {
   private scene: Phaser.Scene;
@@ -40,7 +41,7 @@ export class DebugPanel {
     const fps = Math.round(game.loop.actualFps);
     const frameTime = (1000 / game.loop.actualFps).toFixed(1);
 
-    let lines = `FPS: ${fps}\nFrame: ${frameTime}ms`;
+    let lines = `FPS: ${fps}\nFrame: ${frameTime}ms\nPing: ${networkClient.ping}ms`;
 
     const perf = performance as any;
     if (perf.memory) {

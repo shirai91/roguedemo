@@ -67,6 +67,10 @@ export class GameRoom extends Room<GameState> {
       this.skillSystem.handleLevelSkill(client.sessionId, message.slotIndex, this.state);
     });
 
+    this.onMessage("ping", (client, message) => {
+      client.send("pong", { timestamp: message.timestamp });
+    });
+
     // Start game loop
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), TICK_RATE);
   }
