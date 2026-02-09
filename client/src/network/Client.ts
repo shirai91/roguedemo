@@ -13,8 +13,10 @@ export class NetworkClient {
     this.client = new Client(`${protocol}://${host}${port}`);
   }
 
-  async connect(): Promise<Room> {
-    this.room = await this.client.joinOrCreate("game");
+  async connect(playerName?: string): Promise<Room> {
+    const options: any = {};
+    if (playerName) options.name = playerName;
+    this.room = await this.client.joinOrCreate("game", options);
     this.sessionId = this.room.sessionId;
     return this.room;
   }

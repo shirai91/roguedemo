@@ -73,6 +73,12 @@ export class GameScene extends Phaser.Scene {
   private deathText?: Phaser.GameObjects.Text;
   private isMobile = false;
 
+  // Menu / pause
+  private playerName = 'Anonymous';
+  private pauseOverlay?: Phaser.GameObjects.Container;
+  private menuIcon?: Phaser.GameObjects.Text;
+  private escKey?: Phaser.Input.Keyboard.Key;
+
   constructor() {
     super({ key: 'GameScene' });
   }
@@ -113,7 +119,9 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  async create() {
+  async create(data?: { playerName?: string }) {
+    this.playerName = data?.playerName || 'Anonymous';
+
     // Detect mobile
     this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -130,9 +138,9 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, MAP_WIDTH, MAP_HEIGHT);
     this.cameras.main.setZoom(1);
 
-    // Connect to server
+    // Connect to server with player name
     try {
-      await networkClient.connect();
+      await networkClient.connect(this.playerName);
       console.log('Connected to server');
       this.setupNetworkListeners();
     } catch (error) {
@@ -145,6 +153,28 @@ export class GameScene extends Phaser.Scene {
 
     // Launch UI scene
     this.scene.launch('UIScene');
+
+    // Setup ESC key for pause
+    this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.escKey.on('down', () => {
+      this.togglePause();
+    });
+
+    // Menu icon (top-right, fixed to camera) for mobile
+    this.menuIcon = this.add.text(this.cameras.main.width - 16, 16, '≡', {
+      fontSize: '32px',
+      color: '#aaaaaa',
+      fontFamily: '"Courier New", monospace',
+      backgroundColor: '#00000066',
+      padding: { x: 8, y: 2 },
+    });
+    this.menuIcon.setOrigin(1, 0);
+    this.menuIcon.setScrollFactor(0);
+    this.menuIcon.setDepth(900);
+    this.menuIcon.setInteractive({ useHandCursor: true });
+    this.menuIcon.on('pointerdown', () => {
+      this.togglePause();
+    });
 
     // Setup mobile controls if needed
     if (this.isMobile) {
@@ -716,6 +746,96 @@ export class GameScene extends Phaser.Scene {
       this.deathText.destroy();
       this.deathText = undefined;
     }
+  }
+
+  private togglePause() {
+    if (this.pauseOverlay) {
+      this.hidePause();
+    } else {
+      this.showPause();
+    }
+  }
+
+  private showPause() {
+    if (this.pauseOverlay) return;
+    const { width, height } = this.cameras.main;
+
+    const bg = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
+    bg.setScrollFactor(0);
+    bg.setInteractive(); // block clicks through
+
+    const title = this.add.text(width / 2, height / 2 - 60, 'PAUSED', {
+      fontSize: '48px',
+      color: '#ffffff',
+      fontFamily: '"Courier New", monospace',
+      fontStyle: 'bold',
+    });
+    title.setOrigin(0.5);
+    title.setScrollFactor(0);
+
+    const resumeBtn = this.add.text(width / 2, height / 2 + 10, '[ RESUME ]', {
+      fontSize: '24px',
+      color: '#88ff88',
+      fontFamily: '"Courier New", monospace',
+      backgroundColor: '#1a1a2e',
+      padding: { x: 20, y: 10 },
+    });
+    resumeBtn.setOrigin(0.5);
+    resumeBtn.setScrollFactor(0);
+    resumeBtn.setInteractive({ useHandCursor: true });
+    resumeBtn.on('pointerover', () => resumeBtn.setColor('#aaffaa'));
+    resumeBtn.on('pointerout', () => resumeBtn.setColor('#88ff88'));
+    resumeBtn.on('pointerdown', () => this.hidePause());
+
+    const quitBtn = this.add.text(width / 2, height / 2 + 70, '[ QUIT ]', {
+      fontSize: '24px',
+      color: '#ff6644',
+      fontFamily: '"Courier New", monospace',
+      backgroundColor: '#1a1a2e',
+      padding: { x: 20, y: 10 },
+    });
+    quitBtn.setOrigin(0.5);
+    quitBtn.setScrollFactor(0);
+    quitBtn.setInteractive({ useHandCursor: true });
+    quitBtn.on('pointerover', () => quitBtn.setColor('#ffaa88'));
+    quitBtn.on('pointerout', () => quitBtn.setColor('#ff6644'));
+    quitBtn.on('pointerdown', () => this.quitToMenu());
+
+    this.pauseOverlay = this.add.container(0, 0, [bg, title, resumeBtn, quitBtn]);
+    this.pauseOverlay.setDepth(3000);
+    this.pauseOverlay.setScrollFactor(0);
+  }
+
+  private hidePause() {
+    if (this.pauseOverlay) {
+      this.pauseOverlay.destroy();
+      this.pauseOverlay = undefined;
+    }
+  }
+
+  private quitToMenu() {
+    this.hidePause();
+
+    // Disconnect from server
+    networkClient.disconnect();
+
+    // Stop UIScene
+    this.scene.stop('UIScene');
+
+    // Clean up sprites
+    this.playerSprites.forEach(s => s.container.destroy());
+    this.playerSprites.clear();
+    this.monsterSprites.forEach(s => s.container.destroy());
+    this.monsterSprites.clear();
+    this.projectileSprites.forEach(s => s.destroy());
+    this.projectileSprites.clear();
+    this.itemSprites.forEach(s => s.container.destroy());
+    this.itemSprites.clear();
+    this.droppedSkillSprites.forEach(s => s.container.destroy());
+    this.droppedSkillSprites.clear();
+
+    // Go back to menu
+    this.scene.start('MenuScene');
   }
 
   private updateUIPlayer(player: any) {

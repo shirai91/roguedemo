@@ -94,6 +94,24 @@ export class UIScene extends Phaser.Scene {
 
     // Handle resize
     this.scale.on('resize', this.handleResize, this);
+
+    // Clean up when stopped
+    this.events.on('shutdown', this.cleanup, this);
+  }
+
+  private cleanup() {
+    this.events.off('updatePlayer', this.handlePlayerUpdate, this);
+    this.scale.off('resize', this.handleResize, this);
+    this.events.off('shutdown', this.cleanup, this);
+    this.equipmentSlots = [];
+    this.equipmentItems = [];
+    this.inventorySlots = [];
+    this.skillSlots = [];
+    this.playerData = null;
+    this.nearestItem = null;
+    if (this.deathOverlay) {
+      this.deathOverlay = undefined;
+    }
   }
 
   private createHPBar() {
