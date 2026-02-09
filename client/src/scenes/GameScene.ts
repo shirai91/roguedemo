@@ -7,7 +7,7 @@ const GRID_SIZE = 100;
 
 interface PlayerSprite {
   container: Phaser.GameObjects.Container;
-  rect: Phaser.GameObjects.Rectangle;
+  image: Phaser.GameObjects.Image;
   nameText: Phaser.GameObjects.Text;
   hpBar: Phaser.GameObjects.Graphics;
   hpBg: Phaser.GameObjects.Graphics;
@@ -15,16 +15,16 @@ interface PlayerSprite {
 
 interface MonsterSprite {
   container: Phaser.GameObjects.Container;
-  rect: Phaser.GameObjects.Rectangle;
+  image: Phaser.GameObjects.Image;
   hpBar: Phaser.GameObjects.Graphics;
   hpBg: Phaser.GameObjects.Graphics;
-  border?: Phaser.GameObjects.Graphics;
+  glow?: Phaser.GameObjects.Graphics;
 }
 
 interface ItemSprite {
   container: Phaser.GameObjects.Container;
-  rect: Phaser.GameObjects.Rectangle;
-  glow: Phaser.GameObjects.Arc;
+  image: Phaser.GameObjects.Image;
+  glow: Phaser.GameObjects.Graphics;
 }
 
 export class GameScene extends Phaser.Scene {
@@ -57,6 +57,31 @@ export class GameScene extends Phaser.Scene {
 
   constructor() {
     super({ key: 'GameScene' });
+  }
+
+  preload() {
+    // Player
+    this.load.image('player', 'sprites/player/player.png');
+
+    // Monsters
+    const monsterTypes = [
+      'slime', 'bat', 'imp', 'spider', 'skeleton', 'goblin', 'wolf',
+      'zombie', 'ghost', 'orc', 'wraith', 'harpy', 'troll', 'demon',
+      'basilisk', 'minotaur', 'lich', 'drake', 'golem', 'hydra'
+    ];
+    monsterTypes.forEach(type => {
+      this.load.image(`monster_${type}`, `sprites/monsters/${type}.png`);
+    });
+
+    // Items
+    this.load.image('item_weapon', 'sprites/items/weapon.png');
+    this.load.image('item_armor', 'sprites/items/armor.png');
+    this.load.image('item_ring', 'sprites/items/ring.png');
+    this.load.image('item_amulet', 'sprites/items/amulet.png');
+    this.load.image('item_potion', 'sprites/items/potion.png');
+
+    // Dungeon
+    this.load.image('floor', 'sprites/dungeon/floor.png');
   }
 
   async create() {
@@ -367,10 +392,13 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayer(player: any, key: string) {
     const isLocal = key === networkClient.sessionId;
-    const color = isLocal ? 0x00ff00 : 0x006600;
 
-    const rect = this.add.rectangle(0, 0, 30, 30, color);
-    rect.setStrokeStyle(2, 0x000000);
+    const image = this.add.image(0, 0, 'player');
+    image.setScale(30 / 32);
+    if (!isLocal) {
+      image.setTint(0x88ff88);
+      image.setAlpha(0.8);
+    }
 
     const nameText = this.add.text(0, -30, player.name || 'Player', {
       fontSize: '12px',
@@ -389,9 +417,9 @@ export class GameScene extends Phaser.Scene {
     hpBar.fillStyle(0x00ff00, 1);
     hpBar.fillRect(-15, -22, 30 * hpPercent, 4);
 
-    const container = this.add.container(player.x, player.y, [rect, nameText, hpBg, hpBar]);
+    const container = this.add.container(player.x, player.y, [image, nameText, hpBg, hpBar]);
 
-    this.playerSprites.set(key, { container, rect, nameText, hpBar, hpBg });
+    this.playerSprites.set(key, { container, image, nameText, hpBar, hpBg });
   }
 
   private updatePlayer(player: any, key: string) {
@@ -429,18 +457,37 @@ export class GameScene extends Phaser.Scene {
 
   private createMonster(monster: any, key: string) {
     const size = monster.size || 20;
-    const color = parseInt(monster.color?.replace('#', '0x') || '0xff0000');
+    const scale = size / 32;
+    const spriteKey = `monster_${monster.monsterType}`;
 
-    const rect = this.add.rectangle(0, 0, size, size, color);
-    rect.setStrokeStyle(2, 0x000000);
+    const children: Phaser.GameObjects.GameObject[] = [];
 
-    // Add rarity border
-    let border: Phaser.GameObjects.Graphics | undefined;
-    if (monster.rarity && monster.rarity !== 'normal') {
-      border = this.add.graphics();
-      const borderColor = monster.rarity === 'magic' ? 0x4444ff : 0xffff00;
-      border.lineStyle(3, borderColor, 1);
-      border.strokeRect(-size / 2 - 2, -size / 2 - 2, size + 4, size + 4);
+    // Add rarity glow behind sprite
+    let glow: Phaser.GameObjects.Graphics | undefined;
+    if (monster.rarity === 'magic') {
+      glow = this.add.graphics();
+      glow.fillStyle(0x4444ff, 0.35);
+      glow.fillCircle(0, 0, size / 2 + 6);
+      children.push(glow);
+      this.tweens.add({ targets: glow, alpha: 0.1, duration: 1000, yoyo: true, repeat: -1 });
+    } else if (monster.rarity === 'rare') {
+      glow = this.add.graphics();
+      glow.fillStyle(0xffff00, 0.35);
+      glow.fillCircle(0, 0, size / 2 + 6);
+      children.push(glow);
+      this.tweens.add({ targets: glow, alpha: 0.1, duration: 800, yoyo: true, repeat: -1 });
+    }
+
+    const image = this.add.image(0, 0, spriteKey);
+    image.setScale(scale);
+    children.push(image);
+
+    // Normal monsters get a subtle white border
+    if (!monster.rarity || monster.rarity === 'normal') {
+      const border = this.add.graphics();
+      border.lineStyle(1, 0xffffff, 0.4);
+      border.strokeRect(-size / 2, -size / 2, size, size);
+      children.push(border);
     }
 
     const hpBg = this.add.graphics();
@@ -452,12 +499,11 @@ export class GameScene extends Phaser.Scene {
     hpBar.fillStyle(0xff0000, 1);
     hpBar.fillRect(-size / 2, -size / 2 - 8, size * hpPercent, 4);
 
-    const children: Phaser.GameObjects.GameObject[] = [rect, hpBg, hpBar];
-    if (border) children.push(border);
+    children.push(hpBg, hpBar);
 
     const container = this.add.container(monster.x, monster.y, children);
 
-    this.monsterSprites.set(key, { container, rect, hpBar, hpBg, border });
+    this.monsterSprites.set(key, { container, image, hpBar, hpBg, glow });
   }
 
   private updateMonster(monster: any, key: string) {
@@ -502,22 +548,35 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private getItemSpriteKey(itemId: string): string {
+    if (itemId.includes('sword') || itemId.includes('wand') || itemId.includes('staff')) return 'item_weapon';
+    if (itemId.includes('ring')) return 'item_ring';
+    if (itemId.includes('amulet')) return 'item_amulet';
+    if (itemId.includes('potion')) return 'item_potion';
+    return 'item_armor';
+  }
+
   private createDroppedItem(item: any, key: string) {
     const color = parseInt(item.color?.replace('#', '0x') || '0xffffff');
+    const spriteKey = this.getItemSpriteKey(item.itemId || '');
 
-    const glow = this.add.arc(0, 0, 10, 0, 360, false, color, 0.2);
-    const rect = this.add.rectangle(0, 0, 12, 12, color);
-    rect.setStrokeStyle(1, 0xffffff);
+    const glow = this.add.graphics();
+    glow.fillStyle(color, 0.25);
+    glow.fillCircle(0, 0, 14);
 
-    const container = this.add.container(item.x, item.y, [glow, rect]);
+    const image = this.add.image(0, 0, spriteKey);
+    image.setScale(16 / 32);
 
-    this.itemSprites.set(key, { container, rect, glow });
+    const container = this.add.container(item.x, item.y, [glow, image]);
 
-    // Pulse effect
+    this.itemSprites.set(key, { container, image, glow });
+
+    // Pulse effect on glow
     this.tweens.add({
       targets: glow,
       alpha: 0.5,
-      scale: 1.2,
+      scaleX: 1.3,
+      scaleY: 1.3,
       duration: 800,
       yoyo: true,
       repeat: -1
