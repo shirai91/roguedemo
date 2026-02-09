@@ -6,9 +6,11 @@ export class NetworkClient {
   public sessionId: string = "";
 
   constructor() {
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const host = window.location.hostname || "localhost";
-    this.client = new Client(`${protocol}://${host}:2567`);
+    const isLocal = host === "localhost" || /^192\.168\./.test(host);
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const port = isLocal ? ":2567" : "";
+    this.client = new Client(`${protocol}://${host}${port}`);
   }
 
   async connect(): Promise<Room> {
