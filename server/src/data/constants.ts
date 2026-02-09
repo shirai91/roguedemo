@@ -18,6 +18,7 @@ export const ITEM_PICKUP_RANGE = 50;
 export const SKILL_AUTO_CAST_RANGE = 300;
 export const MAX_SKILLS = 5;
 export const MAX_SKILL_LEVEL = 10;
+export const MAX_PLAYER_LEVEL = 30;
 
 // Runtime state interfaces
 export interface PlayerInput {

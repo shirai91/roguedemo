@@ -1,5 +1,5 @@
 import { GameState, Player, Monster } from "../schemas/GameState";
-import { MonsterState, PlayerState } from "../data/constants";
+import { MonsterState, PlayerState, MAX_PLAYER_LEVEL } from "../data/constants";
 import { MONSTER_TYPES } from "../data/monsters";
 import { LootSystem } from "./LootSystem";
 
@@ -70,7 +70,7 @@ export class CombatSystem {
         player.xp += xpGain;
 
         // Check level up
-        while (player.xp >= player.xpToNext) {
+        while (player.xp >= player.xpToNext && player.level < MAX_PLAYER_LEVEL) {
           player.xp -= player.xpToNext;
           player.level++;
           player.skillPoints += 1;

@@ -1,20 +1,35 @@
 import { GameState, Monster, Player } from "../schemas/GameState";
 import { MonsterState, PlayerState } from "../data/constants";
 import { MONSTER_TYPES, MonsterType } from "../data/monsters";
-import { MAP_WIDTH, MAP_HEIGHT, MONSTER_RESPAWN_DELAY } from "../data/constants";
+import { MAP_WIDTH, MAP_HEIGHT, MONSTER_RESPAWN_DELAY, MAX_PLAYER_LEVEL } from "../data/constants";
 import { CombatSystem } from "./CombatSystem";
 
 export class MonsterAI {
   private monsterIdCounter = 0;
 
+  private getAvgPlayerLevel(state: GameState): number {
+    let totalLevel = 0;
+    let count = 0;
+    state.players.forEach((player) => {
+      totalLevel += player.level;
+      count++;
+    });
+    return count > 0 ? totalLevel / count : 1;
+  }
+
+  private getMonsterLevel(state: GameState): number {
+    const avgLevel = this.getAvgPlayerLevel(state);
+    const minLevel = Math.max(1, Math.round(avgLevel - 2));
+    const maxLevel = Math.min(MAX_PLAYER_LEVEL, Math.round(avgLevel + 2));
+    return Math.floor(Math.random() * (maxLevel - minLevel + 1)) + minLevel;
+  }
+
   spawnMonster(state: GameState, monsterStates: Map<string, MonsterState>) {
     const monsterId = `monster_${this.monsterIdCounter++}`;
 
-    // Select random monster type weighted by level
     const monsterType = MONSTER_TYPES[Math.floor(Math.random() * MONSTER_TYPES.length)];
 
-    // Random level within range
-    const level = Math.floor(Math.random() * (monsterType.maxLevel - monsterType.minLevel + 1)) + monsterType.minLevel;
+    const level = this.getMonsterLevel(state);
 
     // Random rarity
     const rarityRoll = Math.random();
@@ -59,6 +74,12 @@ export class MonsterAI {
 
     const monsterType = MONSTER_TYPES.find(t => t.type === monster.monsterType);
     if (!monsterType) return;
+
+    // Re-roll level based on current avg player level
+    const level = this.getMonsterLevel(state);
+    const rarityMultiplier = monster.rarity === "rare" ? 2.5 : monster.rarity === "magic" ? 1.5 : 1.0;
+    monster.level = level;
+    monster.maxHp = Math.round(monsterType.baseHp * (1 + (level - 1) * 0.1) * rarityMultiplier);
 
     // Reset monster
     monster.x = Math.random() * MAP_WIDTH;
