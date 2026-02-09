@@ -9,8 +9,8 @@ export const PROJECTILE_SPEED = 500;
 export const PROJECTILE_LIFETIME = 2000;
 export const MONSTER_CHASE_RANGE = 300;
 export const MONSTER_ATTACK_RANGE = 50;
-export const TICK_RATE = 50; // 50ms = 20 ticks per second
-export const PATCH_RATE = 100; // 100ms = 10 patches per second
+export const TICK_RATE = 33; // 33ms = ~30 ticks per second
+export const PATCH_RATE = 33; // 33ms = ~30 patches per second
 export const EQUIPMENT_SLOTS = 6;
 export const INVENTORY_SIZE = 20;
 export const MONSTER_RESPAWN_DELAY = 3000;
